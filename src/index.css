@@ -1,0 +1,78 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens — the single source of visual truth for every Geeks project.
+ * Components reference ONLY these tokens (enforced by impeccable/no-arbitrary-tailwind-values).
+ * To re-skin a project, override the values in this @theme block; never touch components.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* ---- Color ramp (neutral default — swap per project) ---- */
+  --color-brand-50: oklch(0.97 0.02 250);
+  --color-brand-100: oklch(0.93 0.04 250);
+  --color-brand-200: oklch(0.87 0.07 250);
+  --color-brand-300: oklch(0.79 0.11 250);
+  --color-brand-400: oklch(0.7 0.15 250);
+  --color-brand-500: oklch(0.62 0.18 250);
+  --color-brand-600: oklch(0.54 0.19 250);
+  --color-brand-700: oklch(0.46 0.17 250);
+  --color-brand-800: oklch(0.39 0.13 250);
+  --color-brand-900: oklch(0.32 0.09 250);
+
+  /* ---- Semantic surface/foreground (drive light + dark) ---- */
+  --color-surface: oklch(1 0 0);
+  --color-surface-muted: oklch(0.97 0 0);
+  --color-surface-inverted: oklch(0.21 0.01 260);
+  --color-foreground: oklch(0.21 0.01 260);
+  --color-foreground-muted: oklch(0.5 0.01 260);
+  --color-border: oklch(0.9 0.005 260);
+  --color-ring: var(--color-brand-500);
+  --color-danger: oklch(0.58 0.22 25);
+  --color-success: oklch(0.62 0.16 150);
+
+  /* ---- Radius scale ---- */
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* ---- Spacing base (v4 multiplies this) ---- */
+  --spacing: 0.25rem;
+
+  /* ---- Type scale ---- */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* ---- Font families ---- */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+}
+
+/* Dark theme token overrides — flip one class on <html> to switch. */
+.dark {
+  --color-surface: oklch(0.21 0.01 260);
+  --color-surface-muted: oklch(0.27 0.01 260);
+  --color-surface-inverted: oklch(0.97 0 0);
+  --color-foreground: oklch(0.97 0 0);
+  --color-foreground-muted: oklch(0.72 0.01 260);
+  --color-border: oklch(0.33 0.01 260);
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-foreground font-sans antialiased;
+  }
+
+  /* Keyboard focus is always visible (WCAG 2.1 AA: focus-visible). */
+  :focus-visible {
+    @apply outline-ring outline-2 outline-offset-2;
+  }
+}

@@ -1,0 +1,12 @@
+---
+description: Test conventions (RTL query priority, no snapshots, required axe assertion)
+globs: "**/*.test.tsx"
+alwaysApply: false
+---
+
+Full rule: see `AGENTS.md` § Testing.
+
+- Use `renderWithProviders` from `src/test/test-utils.tsx`.
+- Query like a user: `getByRole`, `getByLabelText`. **No snapshots.**
+- Every component test MUST include: `expect(await axe(container)).toHaveNoViolations()`.
+- Prefer `findBy*` for async (MSW-backed) data; reset feature stores in `beforeEach`.
