@@ -7,7 +7,8 @@
  * Deliberately doesn't run `check:test` (Vitest) — the suite runs full-repo,
  * every commit, as part of `pnpm verify`/CI (see AGENTS.md § Testing) rather
  * than staged-scoped here, the same tradeoff already made for `ai:check`,
- * `check:lint-contract`, and `check:build` (see AGENTS.md § The Quality Gate).
+ * `check:lint-contract`, `check:build`, and `check:build-budget` (see AGENTS.md § The Quality
+ * Gate).
  *
  * Verifying a change beyond what this hook + `pnpm verify` cover is manual —
  * run it (`pnpm dev`) and exercise the actual feature/component you touched.

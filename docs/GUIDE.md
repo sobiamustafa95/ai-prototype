@@ -160,9 +160,9 @@ docs/                          This guide, onboarding, deep-dive docs
 
 ---
 
-## 7. The Quality Gate — `pnpm verify` (14 checks)
+## 7. The Quality Gate — `pnpm verify` (15 checks)
 
-`pnpm verify` chains these 14 checks, each its own non-mutating `check:*`/`ai:check`/
+`pnpm verify` chains these 15 checks, each its own non-mutating `check:*`/`ai:check`/
 `static-analysis:contract` script. Any failure blocks a merge — and, run staged-file-scoped
 via the commit hook, blocks a commit (except `check:test`/`check:e2e` — see the note below):
 
@@ -188,7 +188,11 @@ via the commit hook, blocks a commit (except `check:test`/`check:e2e` — see th
 12. `check:doctor` — `react-doctor` (the Socket.dev supply-chain scan is skipped here for speed;
     run `pnpm doctor` for the full scan).
 13. `check:build` — the production build succeeds.
-14. `check:e2e` — `playwright test`, Chromium-only smoke-gate against the real production build
+14. `check:build-budget` — `size-limit` against the real `dist/assets/` output (see `AGENTS.md`
+    § Performance Budget for the numbers and how to diagnose a failure). Right after
+    `check:build` since it needs that build's output; a separate, blocking gate from Vite's own
+    advisory `chunkSizeWarningLimit`.
+15. `check:e2e` — `playwright test`, Chromium-only smoke-gate against the real production build
     (`pnpm build:e2e` → `vite preview`). Last on purpose — needs a build to serve, and it's the
     single most expensive check, so every cheaper one fails fast first.
 
@@ -205,22 +209,22 @@ hook uses: `pnpm gate`.
 
 ## 8. Everyday commands
 
-| Command                      | What it does                                                                                                                 |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                   | Start the dev server                                                                                                         |
-| `pnpm build` / `preview`     | Production build / preview it                                                                                                |
-| `pnpm verify`                | **The** canonical gate — all 14 checks, full-repo (see § 7)                                                                  |
-| `pnpm gate`                  | Most of the same checks, scoped to staged files (what commit runs) — not `check:test`/`check:e2e`, see § 7                   |
-| `pnpm check:<name>`          | Run one check standalone (`guardrails`/`lint-contract`/`types`/`test`/`lint`/`a11y`/`format`/`style`/`doctor`/`build`/`e2e`) |
-| `pnpm test`                  | Vitest in watch mode, for local dev (not part of `verify` — `check:test` is)                                                 |
-| `pnpm test:run`              | Vitest, single run (same as `check:test`; part of `verify`)                                                                  |
-| `pnpm test:e2e`              | Playwright, Chromium-only smoke-gate (same as `check:e2e`; part of `verify`)                                                 |
-| `pnpm build:e2e`             | Builds the app with `VITE_E2E=true` to `dist-e2e/` — what `test:e2e` serves via `vite preview`                               |
-| `pnpm lint` / `format`       | Check-only, non-mutating (same as `check:lint`/`check:format`; part of `verify`)                                             |
-| `pnpm lint:fix`/`format:fix` | The mutating versions — actually write the fixes to disk                                                                     |
-| `pnpm doctor`                | React Doctor full scan, incl. the Socket.dev supply-chain check (manual, not part of `verify`)                               |
-| `pnpm ai:sync`               | Rebuild `.cursor/commands` from `.claude/commands` (mutating)                                                                |
-| `pnpm ai:check`              | Verify `.cursor/commands` isn't stale (non-mutating; part of `verify`)                                                       |
+| Command                      | What it does                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                   | Start the dev server                                                                                                                        |
+| `pnpm build` / `preview`     | Production build / preview it                                                                                                               |
+| `pnpm verify`                | **The** canonical gate — all 15 checks, full-repo (see § 7)                                                                                 |
+| `pnpm gate`                  | Most of the same checks, scoped to staged files (what commit runs) — not `check:test`/`check:e2e`, see § 7                                  |
+| `pnpm check:<name>`          | Run one check standalone (`guardrails`/`lint-contract`/`types`/`test`/`lint`/`a11y`/`format`/`style`/`doctor`/`build`/`build-budget`/`e2e`) |
+| `pnpm test`                  | Vitest in watch mode, for local dev (not part of `verify` — `check:test` is)                                                                |
+| `pnpm test:run`              | Vitest, single run (same as `check:test`; part of `verify`)                                                                                 |
+| `pnpm test:e2e`              | Playwright, Chromium-only smoke-gate (same as `check:e2e`; part of `verify`)                                                                |
+| `pnpm build:e2e`             | Builds the app with `VITE_E2E=true` to `dist-e2e/` — what `test:e2e` serves via `vite preview`                                              |
+| `pnpm lint` / `format`       | Check-only, non-mutating (same as `check:lint`/`check:format`; part of `verify`)                                                            |
+| `pnpm lint:fix`/`format:fix` | The mutating versions — actually write the fixes to disk                                                                                    |
+| `pnpm doctor`                | React Doctor full scan, incl. the Socket.dev supply-chain check (manual, not part of `verify`)                                              |
+| `pnpm ai:sync`               | Rebuild `.cursor/commands` from `.claude/commands` (mutating)                                                                               |
+| `pnpm ai:check`              | Verify `.cursor/commands` isn't stale (non-mutating; part of `verify`)                                                                      |
 
 ---
 

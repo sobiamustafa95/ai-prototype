@@ -412,7 +412,7 @@ Subject: lower-case start, no trailing period, ≤ 72 chars. Example:
 
 ## The Quality Gate — one canonical contract: `pnpm verify`
 
-`pnpm verify` is **the** definition of "ready to merge." It chains fourteen checks, each its
+`pnpm verify` is **the** definition of "ready to merge." It chains fifteen checks, each its
 own non-mutating `check:*`/`ai:check`/`static-analysis:contract` script in `package.json`,
 always run full-repo:
 
@@ -457,7 +457,10 @@ lint-config-contract.mjs`) — the guard against someone downgrading a rule to t
     intentional, not a gap: warnings are advisory. Run `pnpm exec react-doctor --blocking warning`
     to audit warnings as if they were blocking, but that is not what `verify`/CI enforce.
 13. `check:build` — the production build succeeds (`vite build`, mode `production`).
-14. `check:e2e` — `playwright test` (see § Testing). Deliberately **last**: it needs a real
+14. `check:build-budget` — `size-limit` (see § Performance Budget) against the real
+    `dist/assets/` output from the `check:build` step just before it — a separate, blocking
+    gate from Vite's own advisory `chunkSizeWarningLimit` (`vite.config.ts`), which stays as-is.
+15. `check:e2e` — `playwright test` (see § Testing). Deliberately **last**: it needs a real
     production build to serve (`pnpm build:e2e` — its own `dist-e2e/`, kept separate from
     `check:build`'s `dist/` so neither disturbs the other), and it's the single most expensive
     check in the chain (a real Chromium browser boot + build), so every cheaper check gets to
@@ -492,7 +495,7 @@ Chromium browser (`pnpm exec playwright install chromium --with-deps` — needed
 runner, `check:e2e` itself doesn't install browsers), runs a handful of the cheaper checks as
 their own named steps for readable CI status (static-analysis, types, lint, a11y, format,
 style), then runs the full `pnpm verify` — which re-runs those same checks plus the rest of
-the 13. The early steps exist for a readable CI status line, not to avoid duplication; the
+the 9. The early steps exist for a readable CI status line, not to avoid duplication; the
 canonical rule set still lives in one place (`pnpm verify`'s own script list), not
 hand-duplicated into the workflow file. On failure, it
 uploads `playwright-report/`/`test-results/` as a build artifact (`if-no-files-found: ignore`
@@ -505,7 +508,8 @@ take a file list or a native staged-scan flag (ESLint, Impeccable, React Doctor'
 Guard Rails has no such CLI, so its logic lives once in `scripts/checks/guard-rails.mjs` and
 both `check:guardrails` (full-repo) and the pre-commit stage (staged-only) import the same
 `guardRails()` function. `static-analysis:contract`, `ai:check`, `check:lint-contract`,
-`check:test`, `check:build`, and `check:e2e` don't have staged-scoped pre-commit stages —
+`check:test`, `check:build`, `check:build-budget`, and `check:e2e` don't have staged-scoped
+pre-commit stages —
 config drift, a broken build, a real-browser boot, and (with today's small suite) the cost of
 running Vitest/Playwright full-repo rather than trying to scope either to staged files are
 whole-repo concerns, not something a per-file staged scan would catch meaningfully faster.
@@ -542,6 +546,63 @@ guarantee zero prompts, in a real terminal or in CI:
 
 Never remove these flags to "see the interactive menu" in a script that runs unattended
 (`verify`, `gate`, CI) — run `pnpm doctor` or `pnpm exec impeccable detect src/` directly instead.
+
+---
+
+## Performance Budget
+
+`check:build-budget` (`size-limit`, config in `.size-limit.js`) is a **blocking** gate on
+`dist/assets/` output size — separate from Vite's own `chunkSizeWarningLimit`
+(`vite.config.ts`), which stays an **advisory-only** warning in the `check:build` log and is
+not touched by this feature. `size-limit` reads gzip size directly off the already-built
+files (`@size-limit/file` — no re-bundling), so it costs nothing beyond `check:build` having
+already run.
+
+Two checks, both glob-based (`dist/assets/index-*.js`, `dist/assets/*.js`) rather than a
+manually maintained per-file list — every existing route/vendor chunk is covered without being
+named, and any new one (a new entry in `PublicRoutes.tsx`/`ProtectedRoutes.tsx`, each already
+lazy-loaded per this section's own convention — see the `> 50KB` comments there) is picked up
+automatically on its next build:
+
+- **Entry bundle** (`dist/assets/index-*.js`) — **195 kB** gzipped. This chunk (React/
+  React-DOM/React Router/TanStack Query/Zustand/Zod/Axios + app shell) downloads on every
+  single page load, lazy-loading aside, so it gets its own budget instead of being averaged
+  into the total below. Baseline at the time this budget was set: **160.95 kB** gzipped
+  (**510.73 kB** raw) — 195 kB is that baseline **+ ~20%** headroom, enough that an ordinary
+  dependency bump doesn't trip it, tight enough that a real regression (a heavy library
+  imported eagerly instead of lazily, e.g.) still fails loudly.
+- **Total JS** (`dist/assets/*.js`) — **268 kB** gzipped, all chunks (entry + every lazy route/
+  vendor chunk) summed. Baseline: **~223 kB** gzipped (**~679 kB** raw); 268 kB is the same
+  **+ ~20%** buffer. Catches what the entry-only check can't — e.g. a new route eagerly
+  importing something heavy instead of lazy-loading it, or an existing lazy chunk quietly
+  growing — without needing a budget per individual page.
+
+Both numbers are gzip, not raw: that's the size that actually crosses the wire, and it's the
+same figure Vite's own `check:build` log already reports, so a diagnosis doesn't require
+converting between two different units.
+
+**Diagnosing a failure.** `check:build-budget`'s own output names the exact check that failed
+and by how much (`Package size limit has exceeded by X kB`) — no separate report to open.
+Locally:
+
+1. `pnpm build` (fresh `dist/`), then `pnpm check:build-budget` (or `pnpm exec size-limit`
+   directly) to reproduce.
+2. Compare against the `vite build` chunk listing just above it (`check:build`'s own output,
+   or re-run `pnpm build` alone) to see which chunk(s) grew.
+3. Most common cause: a new/changed import that isn't lazy — check whether it belongs inside
+   a `lazy(() => import(...))` in `PublicRoutes.tsx`/`ProtectedRoutes.tsx` (this section's own
+   `> 50KB` convention) instead of at module top level. (`size-limit --why` needs the
+   `@size-limit/webpack`/`esbuild` plugins for its bundle-analyzer view — not installed here,
+   deliberately, to keep this check a read of the real Vite output rather than a re-bundle; the
+   chunk listing from step 2 is the equivalent signal for this setup.)
+4. If the growth is real, deliberate, and justified (not an accidental eager import) — update
+   the relevant `limit` in `.size-limit.js` in the same PR, with a comment explaining the new
+   baseline, the same way the numbers above are documented; don't raise the limit silently.
+
+**Deliberately out of scope** (per the issue this shipped under): no `React.memo()`/
+`useMemo()` mandates, render-count limits, or other speculative runtime micro-optimization
+enforcement. This budget only measures what's **measurable and objective** — shipped
+bundle size and code-splitting — the same bar the rest of this gate holds every other check to.
 
 ---
 
