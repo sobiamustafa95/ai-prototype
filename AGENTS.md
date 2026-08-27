@@ -37,10 +37,14 @@ Two rules override everything else:
 - **Env validation:** Zod-validated `import.meta.env` (`src/constants/env.ts`) — fails loudly
   at startup on a missing/malformed env var instead of shipping a silent misconfiguration.
 - **Testing:** Vitest + React Testing Library, jsdom environment (`vite.config.ts`'s `test`
-  block; see § Testing below). No coverage thresholds, no Storybook.
+  block), plus Playwright (Chromium-only smoke-gate, `e2e/`) — see § Testing below. No
+  coverage thresholds, no Storybook.
 - **API mocking:** MSW — `msw/browser` in dev (fake API responses for the app to hit),
   `msw/node` in tests (`src/mocks/server.ts`), both built from the same `src/mocks/handlers.ts`
 - **Lint/format:** ESLint (flat config) + Prettier · **Hooks:** Husky + lint-staged + commitlint
+- **Package manager:** pnpm only — `pnpm-lock.yaml` is canonical, `packageManager` in
+  `package.json` pins the version. See § Package Manager & Supply Chain for the install-time
+  hardening this implies.
 
 Do not substitute a stack choice without flagging it first.
 
@@ -325,14 +329,59 @@ named, which is most of the signal a dedicated a11y-in-tests tool would add on t
 **No coverage reporting or thresholds** — not configured, not a target to chase. Add one
 later as its own decision, not a side effect of adding tests.
 
+**Browser-layer smoke tests (Playwright, Chromium only).** A third, much narrower layer:
+`e2e/*.spec.ts` (shared fixture `e2e/fixtures.ts`), run via `pnpm test:e2e`/`pnpm check:e2e`,
+against the real production build (`pnpm build:e2e` → `vite preview` — see
+`playwright.config.ts`). This is a **small, deterministic smoke-gate**, not a second E2E
+suite duplicating Vitest/RTL: it proves the app boots in a real browser, one reference route
+renders, the MSW **browser** worker actually serves a real fetch call, and one representative
+user interaction works end-to-end. **Do not write a Playwright test just because a file is a
+component** — component/state behavior belongs in a Vitest/RTL workflow test; reach for
+Playwright only for something only a real browser can prove (a real network request through
+the actual MSW service worker, a genuine page load/boot, real layout/paint). New features do
+**not** each get their own Playwright spec — `e2e/smoke.spec.ts` stays the one, centralized
+smoke-gate; only extend it if the smoke-gate itself needs to cover a new reference route. The
+shared fixture fails any test where the page logs a `console.error`/uncaught `pageerror` (a
+narrow, explicitly documented allowlist exists for genuinely unavoidable third-party noise —
+never a blanket suppression), and exposes `checkA11y()` (axe-core) for a page-level scan.
+For local visual debugging, `pnpm test:e2e:headed` (`playwright test --headed`) is the default
+recommendation — the whole suite in a visible browser, no changed-detection. At today's size
+(one spec, ~5s) running everything is cheap and safe: you always see a real pass/fail, never a
+`0 tests` result you might misread as "nothing broke."
+
+`pnpm test:e2e:changed` (`playwright test --only-changed --headed`) is an advanced option for
+once the suite is large enough that a full headed run is slow — **not** the default. Its
+dependency graph only follows what `e2e/*.ts` files themselves `import` (i.e.
+`e2e/fixtures.ts`), not the app source (`src/`) a spec merely drives over the network/browser.
+Editing `e2e/smoke.spec.ts`/`fixtures.ts` triggers it; editing an app component (e.g.
+`ExampleWidget.tsx`) does not — that shows `0 tests`, not a false pass, but don't mistake it for
+"the smoke gate is clean." `pnpm verify`/CI always run the full `e2e/` suite headless regardless
+of either local script; changed-only is a narrow local convenience, never how the gate itself
+decides what to run.
+
+**Requirement → test-layer mapping:**
+
+| What you're testing                                            | Layer                                                                                    |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| A feature's user-facing flow (load → interact → success/error) | Vitest + RTL workflow test (`*.workflow.test.tsx`)                                       |
+| `src/services/`/`src/hooks/` logic shared across features      | Vitest, standalone `*.test.ts`                                                           |
+| The app actually boots, in a real browser                      | Playwright (`e2e/smoke.spec.ts`)                                                         |
+| A real network round trip through the MSW **browser** worker   | Playwright                                                                               |
+| Accessibility — component level                                | RTL's `getByRole`/`getByLabelText` queries (a mislabeled element simply fails the query) |
+| Accessibility — route level                                    | Playwright + axe-core (`checkA11y()` in `e2e/fixtures.ts`)                               |
+
+A component-level unit test (isolated `Button`/`Input`/etc.) is not on this table on purpose
+— see the philosophy note above.
+
 Building a new feature (`fe-component-scaffold` skill, `/new-feature`)? Copy
 `src/components/example/`'s `ExampleWidget.workflow.test.tsx` alongside its component and
 adapt it — the workflow test is part of the reference shape to copy, not a follow-up step.
+(Not a new Playwright spec — see above.)
 
 Beyond automated tests, verify a change by running it too: `pnpm dev`, exercise the actual
 feature/component you touched, and lean on the rest of the gate (`pnpm verify`) for
 everything mechanical — types, lint, accessibility lint, format, style consistency, React
-Doctor, the build (see § Quality Gate).
+Doctor, the build, the browser smoke-gate (see § Quality Gate).
 
 ---
 
@@ -363,33 +412,42 @@ Subject: lower-case start, no trailing period, ≤ 72 chars. Example:
 
 ## The Quality Gate — one canonical contract: `pnpm verify`
 
-`pnpm verify` is **the** definition of "ready to merge." It chains eleven checks, each its
-own non-mutating `check:*`/`ai:check` script in `package.json`, always run full-repo:
+`pnpm verify` is **the** definition of "ready to merge." It chains fourteen checks, each its
+own non-mutating `check:*`/`ai:check`/`static-analysis:contract` script in `package.json`,
+always run full-repo:
 
 1. `check:guardrails` — secrets, merge markers, `eslint-disable`, oversized files (rule set
    lives in `scripts/checks/guard-rails.mjs`). Deliberately narrow: `console.*`, `as any`, and
    `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck` used to be regex-checked here too, but ESLint
    now catches all three more reliably (AST-based, not regex) — see that file's own comment
    for exactly which rule replaced which check.
-2. `ai:check` — asserts `.cursor/commands/` matches what `pnpm ai:sync` would generate from
+2. `static-analysis:contract` — asserts the required ESLint rules/TS compiler options haven't
+   silently regressed (`scripts/check-static-analysis.mjs`); overlaps in spirit with
+   `check:lint-contract` below (both guard against the same failure mode, from two separate
+   scripts) — a known duplication, not a deliberate two-layer design.
+3. `ai:check` — asserts `.cursor/commands/` matches what `pnpm ai:sync` would generate from
    `.claude/commands/`, without writing anything (`scripts/checks/ai-config-contract.mjs`,
    sharing its comparison logic with `scripts/sync-ai-config.mjs` so the two can't define "in
    sync" differently) — see § Checks vs Fixes.
-3. `check:lint-contract` — asserts the specific ESLint rule severities and `tsconfig.*.json`
+4. `check:lint-contract` — asserts the specific ESLint rule severities and `tsconfig.*.json`
    compiler options this section documents haven't silently regressed (`scripts/checks/
 lint-config-contract.mjs`) — the guard against someone downgrading a rule to turn a red
    `verify` green instead of fixing the code that tripped it.
-4. `check:types` — `tsc -b --noEmit` (strict; see this section's TypeScript/ESLint strictness
+5. `check:hardening` — asserts the specific config/doc details three previously-shipped
+   hardening features (Playwright browser-quality gate, Agent Execution Safety, pnpm
+   supply-chain) depend on haven't silently drifted (`scripts/checks/hardening-contract.mjs`)
+   — grouped here with the other `*-contract` checks, before anything more expensive runs.
+6. `check:types` — `tsc -b --noEmit` (strict; see this section's TypeScript/ESLint strictness
    bullets below for exactly how strict).
-5. `check:test` — `vitest run` (see § Testing). Placed right after `check:types` and before
+7. `check:test` — `vitest run` (see § Testing). Placed right after `check:types` and before
    the lint/format/style stages: a broken component is a more valuable signal to catch early
    than a lint nit, and it should block before `check:build` (the most expensive stage) even
    starts, not after.
-6. `check:lint` — ESLint (hooks, `jsx-key`, prop types, hardcoded text, tokens).
-7. `check:a11y` — strict `jsx-a11y` pass.
-8. `check:format` — Prettier, check-only.
-9. `check:style` — `impeccable detect` (`< /dev/null` — see § Non-interactive by design below).
-10. `check:doctor` — `react-doctor` (`--no-supply-chain` skips the Socket.dev scan for speed,
+8. `check:lint` — ESLint (hooks, `jsx-key`, prop types, hardcoded text, tokens).
+9. `check:a11y` — strict `jsx-a11y` pass.
+10. `check:format` — Prettier, check-only.
+11. `check:style` — `impeccable detect` (`< /dev/null` — see § Non-interactive by design below).
+12. `check:doctor` — `react-doctor` (`--no-supply-chain` skips the Socket.dev scan for speed,
     run `pnpm doctor` for the full scan including that check; `--yes` — see below). **Only
     `error`-severity findings fail this check.** `doctor.config.ts` sets `blocking: 'error'`
     (react-doctor's own default), so a warning-only finding — e.g. this boilerplate's own
@@ -398,7 +456,12 @@ lint-config-contract.mjs`) — the guard against someone downgrading a rule to t
     output and lowers the score, but does **not** fail `check:doctor`, `verify`, or CI. This is
     intentional, not a gap: warnings are advisory. Run `pnpm exec react-doctor --blocking warning`
     to audit warnings as if they were blocking, but that is not what `verify`/CI enforce.
-11. `check:build` — the production build succeeds.
+13. `check:build` — the production build succeeds (`vite build`, mode `production`).
+14. `check:e2e` — `playwright test` (see § Testing). Deliberately **last**: it needs a real
+    production build to serve (`pnpm build:e2e` — its own `dist-e2e/`, kept separate from
+    `check:build`'s `dist/` so neither disturbs the other), and it's the single most expensive
+    check in the chain (a real Chromium browser boot + build), so every cheaper check gets to
+    fail fast first.
 
 **TypeScript/ESLint strictness.** Both `tsconfig.app.json`/`tsconfig.node.json` and
 `eslint.config.js` run the strongest maintained preset each tool ships, not a relaxed subset:
@@ -424,20 +487,29 @@ lint-config-contract.mjs`) — the guard against someone downgrading a rule to t
   options — the node-tooling project (`vite.config.ts`, `doctor.config.ts`, `scripts/`) is
   held to the same bar as the app project, not a looser one.
 
-**CI** (`.github/workflows/quality-gate.yml`) does nothing but
-`pnpm install --frozen-lockfile && pnpm verify` — no separate, hand-duplicated step list to
-drift out of sync with what you ran locally.
+**CI** (`.github/workflows/quality-gate.yml`) installs dependencies, installs Playwright's
+Chromium browser (`pnpm exec playwright install chromium --with-deps` — needed once per
+runner, `check:e2e` itself doesn't install browsers), runs a handful of the cheaper checks as
+their own named steps for readable CI status (static-analysis, types, lint, a11y, format,
+style), then runs the full `pnpm verify` — which re-runs those same checks plus the rest of
+the 13. The early steps exist for a readable CI status line, not to avoid duplication; the
+canonical rule set still lives in one place (`pnpm verify`'s own script list), not
+hand-duplicated into the workflow file. On failure, it
+uploads `playwright-report/`/`test-results/` as a build artifact (`if-no-files-found: ignore`
+— a no-op when `verify` failed before `check:e2e` ever ran) so a human or agent can open the
+trace/screenshots afterward without reproducing the failure locally first.
 
 **`scripts/hooks/pre-commit.mjs`**, run by Husky on every commit, runs the **same** checks —
 never a different rule set — scoped to just the staged files, for commit speed. Most tools
 take a file list or a native staged-scan flag (ESLint, Impeccable, React Doctor's `--staged`);
 Guard Rails has no such CLI, so its logic lives once in `scripts/checks/guard-rails.mjs` and
 both `check:guardrails` (full-repo) and the pre-commit stage (staged-only) import the same
-`guardRails()` function. `ai:check`, `check:lint-contract`, `check:test`, and `check:build`
-don't have staged-scoped pre-commit stages — config drift, a broken build, and (with today's
-small suite) the cost of running Vitest full-repo rather than trying to scope it to staged
-files are whole-repo concerns, not something a per-file staged scan would catch meaningfully
-faster. The test suite still blocks every `pnpm verify` run and CI — just not every commit.
+`guardRails()` function. `static-analysis:contract`, `ai:check`, `check:lint-contract`,
+`check:test`, `check:build`, and `check:e2e` don't have staged-scoped pre-commit stages —
+config drift, a broken build, a real-browser boot, and (with today's small suite) the cost of
+running Vitest/Playwright full-repo rather than trying to scope either to staged files are
+whole-repo concerns, not something a per-file staged scan would catch meaningfully faster.
+Both suites still block every `pnpm verify` run and CI — just not every commit.
 
 A green `pnpm verify` locally **is** the same contract pre-commit and CI enforce — there is
 no longer a way for it to pass while the hook or CI fails. `--no-verify` is an emergency escape
@@ -473,7 +545,34 @@ Never remove these flags to "see the interactive menu" in a script that runs una
 
 ---
 
-## Checks vs Fixes
+## Package Manager & Supply Chain
+
+pnpm only — `pnpm-lock.yaml` is canonical, `package.json`'s `packageManager` field pins the
+exact version, CI installs with `pnpm install --frozen-lockfile`. This section is the current
+policy only; see `pnpm-workspace.yaml`'s own comments for the per-setting reasoning.
+
+- **`minimumReleaseAge: 4320`** (`pnpm-workspace.yaml`) — a package version must be published
+  ≥ 3 days before pnpm will install it, on every install (including CI's frozen-lockfile
+  runs — pnpm re-verifies each locked entry's registry publish time unless `trustLockfile` is
+  set, which this repo never sets). Delays adoption of a version that turns out to be
+  compromised long enough for the ecosystem to catch and pull it first. 3 days, not pnpm 11's
+  own 1-day default: more margin, still short enough that Dependabot's grouped weekly PRs
+  aren't routinely blocked by it.
+- **`allowBuilds`** (`pnpm-workspace.yaml`) — only dependencies verified to genuinely need
+  their install/postinstall script may run it (`msw`: regenerates
+  `public/mockServiceWorker.js` from this repo's own config, local file copy only;
+  `puppeteer`: explicitly **denied** — an optional transitive dep of `impeccable` that this
+  repo's actual `check:style` invocation never exercises, see the file's own comment for how
+  that was confirmed). Everything else's build scripts stay blocked by pnpm's own default
+  (`strictDepBuilds`) — a new dependency that starts shipping a script fails the install until
+  reviewed and added here, never runs silently.
+- **`.github/dependabot.yml`** — weekly, both the `npm` ecosystem (pnpm's lockfile format) and
+  `github-actions`. Minor/patch bumps are grouped into one PR each (less noise); major bumps
+  are deliberately left ungrouped, one PR per breaking change, for individual review.
+- **GitHub Actions are SHA-pinned**, not tag-pinned (`# vX.Y.Z` comment alongside each for
+  readability) — a tag like `@v4` can be force-moved to point at different, potentially
+  malicious code; a commit SHA can't. Applies to every third-party action in
+  `.github/workflows/*.yml`.
 
 Every bare command a person or an agent runs to _investigate_ something (`pnpm lint`,
 `pnpm format`, `pnpm verify`, any `pnpm check:*`, `pnpm ai:check`) only reports — it never
@@ -486,6 +585,42 @@ files you're about to commit anyway, and is not what this section is about.
 
 Rule of thumb: if a command's name doesn't end in `:fix` and isn't `ai:sync`, it's safe to run
 blind — on someone else's branch, in CI, from a script — without checking `git diff` first.
+
+## Agent Execution Safety
+
+Binds every autonomous coding agent working in this repo — Claude Code, Cursor, or any future
+tool — including this ongoing execution plan from this point forward. A scannable reference,
+not a discussion; see § Checks vs Fixes above for the command-mutation half of this contract.
+
+- **Inspect before edit.** Read a file's current content, and relevant repo state (related
+  config, tests), before changing it — never edit from assumption.
+- **Preserve unrelated changes.** Uncommitted working-tree changes unrelated to the current
+  task are not yours to touch, discard, or overwrite.
+- **No unrelated file edits.** Touch only files inside the task's scope. Notice something else
+  worth fixing while you're in there? Flag it as a follow-up — don't fold it into this diff.
+- **Smallest-change preference.** Ship the smallest diff that actually satisfies the task. A
+  broader refactor needs a genuine, stated reason — "while I'm here" is not one.
+- **Git mutation boundaries.** Never run, without an explicit human instruction for that
+  specific action: `git reset`, `git push --force`/`--force-with-lease`, `git commit --amend`,
+  `git rebase`, deleting a branch, or `git checkout -- <file>`/`git restore` (discarding
+  changes) — or any other destructive git operation. "Explicitly requested" means a direct
+  instruction for that exact action, not something implied by "the task is done."
+- **No auto-commit/push.** Never `git commit` or `git push` on your own initiative — finishing
+  the task is not authorization. Commit/push only on a direct instruction ("commit this",
+  "push it").
+- **Bounded retry.** Stop after **3** materially-equivalent failed attempts at the same
+  operation (same test fix, same build error) and report the blocker — don't try a 4th time.
+  "Materially equivalent failure" means the same root cause, even if the surface symptom
+  changes each attempt (a timeout, then a type error, then an assertion failure, all traced to
+  the same broken assumption, count as one repeated failure, not three distinct ones).
+- **Verify before completion.** Run the relevant targeted `check:*` while working, then run the
+  full `pnpm run verify` before claiming the task is done — a passing targeted check alone is
+  not completion.
+- **Final diff inspection.** Before reporting completion, review `git status`/`git diff` and
+  confirm only the intended files changed — no accidental or unexpected modification.
+- **Escalate, don't weaken.** If the requested behavior conflicts with an enforced constraint
+  (a test, a lint rule, type safety, a security control), stop and ask how to proceed — never
+  weaken, disable, or bypass the constraint to make the conflict go away.
 
 ## Never Do (in the boilerplate or any project built on it)
 

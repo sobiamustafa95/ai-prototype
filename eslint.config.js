@@ -48,16 +48,27 @@ const impeccable = {
 };
 
 export default tseslint.config(
+  // A flat-config object only acts as a true *global* ignore when `ignores`
+  // is its sole key — bundled with `linterOptions` (below) it silently
+  // stopped being global, which is how a stale local build (dist/, dist-e2e/)
+  // ended up getting linted as if it were source. Keep this object
+  // ignores-only.
   {
     ignores: [
       'node_modules',
       'dist',
+      'dist-e2e',
       'build',
       '.husky',
       '*.min.js',
       'src/mocks/browser-worker/**',
       // Generated MSW service worker.
       'public/mockServiceWorker.js',
+      // Playwright's own run output (see .gitignore).
+      'test-results',
+      'playwright-report',
+      'blob-report',
+      '.playwright',
       // Vendored agent-skill installs (`npx impeccable install`) — gitignored, not
       // boilerplate source; see .gitignore for the full list.
       '.claude/skills/impeccable/**',
@@ -67,6 +78,8 @@ export default tseslint.config(
       '.github/agents/**',
       '.github/hooks/**',
     ],
+  },
+  {
     // Bypassing a rule inline is itself a policy violation. Change the central config
     // with a documented rationale instead of weakening enforcement at the call site.
     linterOptions: {
@@ -242,6 +255,18 @@ export default tseslint.config(
     files: ['**/*.test.{ts,tsx}'],
     rules: {
       'react/jsx-no-literals': 'off',
+    },
+  },
+
+  // Playwright e2e specs/fixtures: not React code (no JSX, no hooks) — but
+  // Playwright's own fixture API takes a callback parameter literally named
+  // `use`, which react-hooks/rules-of-hooks pattern-matches as if it were
+  // React's use() and flags as misplaced. False positive specific to this
+  // naming collision, not a real violation.
+  {
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
     },
   },
 

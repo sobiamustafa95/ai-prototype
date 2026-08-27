@@ -9,9 +9,8 @@ Authoritative rules: `AGENTS.md`.
 
 ## Absolute rules
 
-- Never `git commit --no-verify`, never add `eslint-disable`, `as any`, `!`, or `@ts-ignore`.
 - Fix the code, not the check. A11y and type fixes are permanent correctness fixes.
-- Never commit on the developer's behalf unless explicitly asked.
+- Suppression/commit/git boundaries: see `AGENTS.md` § Never Do and § Agent Execution Safety.
 
 ## Procedure
 

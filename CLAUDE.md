@@ -12,7 +12,6 @@
   `fe-component-scaffold`, `fe-a11y-audit`, `fe-prototype`, `fe-debug`).
 - `AGENTS.md` is the full rulebook; `docs/GUIDE.md` is the friendlier walkthrough with the
   same rules explained end to end. Read one of the two before writing or editing any component.
-- Never run `git commit --no-verify` on the developer's behalf. Never add `eslint-disable`
-  or `as any` to make the gate pass — fix the underlying code.
+- Git/commit/execution boundaries: see `AGENTS.md` § Agent Execution Safety and § Never Do.
 - After changing any `.claude/commands/*.md`, run `pnpm ai:sync` so Cursor's mirror stays current
   (`pnpm ai:check` — part of `pnpm verify` — fails CI if you forget).

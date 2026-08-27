@@ -23,5 +23,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ['src/test/setup.ts'],
     css: false,
+    // Vitest's own default include pattern is repo-wide (`**/*.{test,spec}.*`)
+    // and would otherwise also pick up e2e/*.spec.ts — those are Playwright
+    // specs, run only by `pnpm test:e2e`, not this runner.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 });

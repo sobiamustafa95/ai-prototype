@@ -40,12 +40,15 @@ See `AGENTS.md` § Directory Map for what belongs where.
 
 ## The quality gate (blocks the commit)
 
-`pnpm verify` is the single canonical check — 11 checks (guard rails, AI-command sync,
-lint-config-contract, types, tests, lint, a11y, format, style, React Doctor, build), each its
-own `check:*`/`ai:check` script, always full-repo and non-mutating. CI runs nothing but that
-same command. `scripts/hooks/pre-commit.mjs` runs most of these on every commit, scoped to
+`pnpm verify` is the single canonical check — 14 checks (guard rails, static-analysis contract,
+AI-command sync, lint-config-contract, a hardening-features contract, types, tests, lint, a11y,
+format, style, React Doctor, build, and a Playwright browser smoke-gate), each its own `check:*`/`ai:check`/
+`static-analysis:contract` script, always full-repo and non-mutating. CI runs a handful of the
+cheaper checks as their own named steps first (for a readable status line), then runs the full
+`pnpm verify` — the canonical rule set still lives in one place, not hand-duplicated into the
+workflow. `scripts/hooks/pre-commit.mjs` runs most of these on every commit, scoped to
 just the staged files for speed — same rule set, not a different one (a couple, like the build
-and the test suite, are whole-repo concerns a staged scan can't meaningfully speed up). See
+and the test suites, are whole-repo concerns a staged scan can't meaningfully speed up). See
 `AGENTS.md` § The Quality Gate for the full breakdown, and § Checks vs Fixes for which
 commands are safe to run blind.
 
@@ -53,18 +56,21 @@ commands are safe to run blind.
 
 ## Scripts
 
-| Script                           | Does                                                                                                      |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `pnpm dev` / `build` / `preview` | Vite dev / prod build / preview                                                                           |
-| `pnpm verify`                    | **The** canonical gate — all 11 checks, full-repo                                                         |
-| `pnpm gate`                      | Run most of the same checks scoped to staged files (pre-commit) — not `check:test`, see `AGENTS.md`       |
-| `pnpm check:<name>`              | Run one check standalone — see `AGENTS.md` for the list of 11                                             |
-| `pnpm test` / `test:run`         | Vitest watch mode / single run (`test:run` is what `check:test` runs)                                     |
-| `pnpm lint` / `format`           | Check-only, non-mutating (part of `verify`)                                                               |
-| `pnpm lint:fix` / `format:fix`   | The mutating versions — write the fixes to disk                                                           |
-| `pnpm ai:sync`                   | Regenerate `.cursor/commands/` from `.claude/commands/` (mutating)                                        |
-| `pnpm ai:check`                  | Verify `.cursor/commands/` isn't stale (non-mutating; part of `verify`)                                   |
-| `pnpm doctor`                    | React Doctor full scan, including the Socket.dev supply-chain check (manual/opt-in, not part of `verify`) |
+| Script                           | Does                                                                                                            |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev` / `build` / `preview` | Vite dev / prod build / preview                                                                                 |
+| `pnpm verify`                    | **The** canonical gate — all 14 checks, full-repo                                                               |
+| `pnpm gate`                      | Run most of the same checks scoped to staged files (pre-commit) — not `check:test`/`check:e2e`, see `AGENTS.md` |
+| `pnpm check:<name>`              | Run one check standalone — see `AGENTS.md` for the list of 14                                                   |
+| `pnpm test` / `test:run`         | Vitest watch mode / single run (`test:run` is what `check:test` runs)                                           |
+| `pnpm test:e2e:headed`           | Playwright, whole suite, visible browser — local visual debugging (not required by the gate)                    |
+| `pnpm test:e2e:changed`          | Playwright, `--only-changed`, visible browser — advanced; only tracks `e2e/` files, not `src/`, see `AGENTS.md` |
+| `pnpm test:e2e` / `check:e2e`    | Playwright, headless (what `verify`/CI run)                                                                     |
+| `pnpm lint` / `format`           | Check-only, non-mutating (part of `verify`)                                                                     |
+| `pnpm lint:fix` / `format:fix`   | The mutating versions — write the fixes to disk                                                                 |
+| `pnpm ai:sync`                   | Regenerate `.cursor/commands/` from `.claude/commands/` (mutating)                                              |
+| `pnpm ai:check`                  | Verify `.cursor/commands/` isn't stale (non-mutating; part of `verify`)                                         |
+| `pnpm doctor`                    | React Doctor full scan, including the Socket.dev supply-chain check (manual/opt-in, not part of `verify`)       |
 
 ## How AI tooling works here (Cursor ⇄ Claude Code)
 

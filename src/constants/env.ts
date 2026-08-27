@@ -11,6 +11,11 @@ import { z } from 'zod';
 const envSchema = z.object({
   VITE_API_BASE_URL: z.string().default(''),
   VITE_ENABLE_MOCKS: z.enum(['true', 'false']).default('true'),
+  // Set only by `.env.e2e` (via `pnpm build:e2e`'s `--mode e2e`) — never by a
+  // real deploy. Lets the production-mode build still start the MSW browser
+  // worker for Playwright, without weakening `import.meta.env.DEV`'s own
+  // build-time truthiness for every other prod build (see main.tsx).
+  VITE_E2E: z.enum(['true', 'false']).default('false'),
 });
 
 function parseEnv(): z.infer<typeof envSchema> {
