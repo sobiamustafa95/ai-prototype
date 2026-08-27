@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Static-analysis contract
+        run: npm run static-analysis:contract
+
       - name: Type check
         run: npm run typecheck
 

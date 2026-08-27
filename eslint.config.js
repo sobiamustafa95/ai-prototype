@@ -67,11 +67,18 @@ export default tseslint.config(
       '.github/agents/**',
       '.github/hooks/**',
     ],
+    // Bypassing a rule inline is itself a policy violation. Change the central config
+    // with a documented rationale instead of weakening enforcement at the call site.
+    linterOptions: {
+      noInlineConfig: true,
+      reportUnusedDisableDirectives: 'error',
+    },
   },
 
-  // Base JS + TS (type-checked) recommended sets.
+  // Base JS + TS strict, type-checked rules. strictTypeChecked is intentionally chosen
+  // for this starter so AI-authored code receives the strongest practical static feedback.
   js.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
+  ...tseslint.configs.strictTypeChecked,
 
   {
     files: ['**/*.{ts,tsx}'],
@@ -96,12 +103,18 @@ export default tseslint.config(
       impeccable,
     },
     rules: {
-      // ---- React best practices (FE_QUALITY_GATE_SETUP.md Phase 2) ----
+      // Start from maintained React and Hooks presets, then apply repository-specific
+      // strictness/compatibility overrides below. This avoids hand-maintaining rule lists.
+      ...react.configs.flat.recommended.rules,
+      ...react.configs.flat['jsx-runtime'].rules,
+      ...reactHooks.configs.flat.recommended.rules,
+
+      // ---- React best practices ----
       'react/react-in-jsx-scope': 'off',
       'react/jsx-uses-react': 'off',
       'react/prop-types': 'off',
-      'react/display-name': 'warn',
-      'react/no-unescaped-entities': 'warn',
+      'react/display-name': 'error',
+      'react/no-unescaped-entities': 'error',
       'react/jsx-key': 'error',
       'react/jsx-no-comment-textnodes': 'error',
       'react/jsx-no-duplicate-props': 'error',
@@ -115,8 +128,10 @@ export default tseslint.config(
       'react/no-array-index-key': 'error',
 
       // ---- Hooks ----
+      // The maintained preset owns the rule set; dependency correctness is promoted
+      // from its warning default to a blocking error for this boilerplate.
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/exhaustive-deps': 'error',
 
       // ---- Accessibility (WCAG 2.1 AA gate) ----
       'jsx-a11y/alt-text': 'error',
@@ -135,9 +150,9 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/await-thenable': 'warn',
-      '@typescript-eslint/no-misused-promises': 'warn',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
       // Boilerplate must be a clean example of its own rules: no escape hatches.
       '@typescript-eslint/no-non-null-assertion': 'error',
       '@typescript-eslint/ban-ts-comment': 'error',
@@ -160,11 +175,11 @@ export default tseslint.config(
     },
   },
 
-  // Fast-refresh hint is only meaningful for component modules.
+  // Fast-refresh correctness is only meaningful for component modules.
   {
     files: ['src/components/**/*.tsx'],
     rules: {
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
     },
   },
 

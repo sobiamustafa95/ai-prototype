@@ -8,10 +8,9 @@
  * (run the app, check the feature) or per-project, if a team adds one back.
  *
  * Stages (each BLOCKS the commit):
- *   1. Guard Rails         — console.*, secrets, merge markers, `as any`,
- *                            eslint-disable, oversized files
- *   2. Type Safety         — tsc --noEmit (strict)
- *   3. Lint & Conventions  — ESLint (hooks, jsx-key, prop types, hardcoded text, tokens)
+ *   1. Guard Rails         — secrets, merge markers, eslint-disable, oversized files
+ *   2. Type Safety         — tsc --noEmit (strict) + static-analysis config contract
+ *   3. Lint & Conventions  — ESLint (hooks, JSX, TypeScript, hardcoded text, tokens)
  *   4. Accessibility       — strict jsx-a11y pass (eslint.a11y.config.js)
  *   5. Style Consistency   — impeccable detect (staged tsx/jsx/css)
  *   6. React Diagnostics   — react-doctor --staged (supply-chain/Socket.dev scan skipped for
@@ -54,7 +53,6 @@ const staged = stagedFiles();
 const stagedSrc = staged.filter((f) => /^src\/.*\.(ts|tsx)$/.test(f));
 const stagedTsx = staged.filter((f) => /^src\/.*\.tsx$/.test(f));
 const stagedStyleFiles = staged.filter((f) => /^src\/.*\.(tsx|jsx|css)$/.test(f));
-// Guard rails ignore mocks/scaffolding where console/etc. are legitimate.
 const productionSrc = stagedSrc.filter(
   (f) => !/\.stories\.tsx?$/.test(f) && !f.startsWith('src/mocks/')
 );
@@ -84,13 +82,10 @@ function runCommand(cmd) {
   return result.status === 0;
 }
 
-// ---- Stage 1: Guard Rails (static content scan) ----
+// ---- Stage 1: Guard Rails (only checks not reliably owned by ESLint/TypeScript) ----
 const GUARD_PATTERNS = [
-  { rule: 'no-console', re: /\bconsole\.[a-z]+\s*\(/, message: 'console.* is not allowed in production code' },
   { rule: 'no-merge-marker', re: /^(<{7}|={7}|>{7})(\s|$)/, message: 'unresolved merge conflict marker' },
-  { rule: 'no-as-any', re: /\bas\s+any\b/, message: '`as any` is banned — fix the real type' },
   { rule: 'no-eslint-disable', re: /eslint-disable/, message: 'eslint-disable is banned — fix the code, not the check' },
-  { rule: 'no-ts-ignore', re: /@ts-(ignore|nocheck|expect-error)/, message: 'TS suppression comments are banned' },
   { rule: 'no-secret', re: /(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(api|secret|access)[_-]?key\s*[:=]\s*['"][^'"]{12,}['"])/i, message: 'possible hardcoded secret — move it to .env' },
 ];
 
@@ -124,11 +119,13 @@ function guardRails() {
   console.log(`  ${c.green}✓ no guard-rail violations${c.reset}`);
 }
 
-// ---- Stages 2-6 (command-driven) ----
 function typeSafety() {
   console.log(`\n${c.cyan}\u{1F4CB} Stage 2/6 — Type Safety${c.reset}`);
   if (!runCommand('npm run typecheck --silent')) fail('Type Safety', { command: 'tsc --noEmit' });
-  console.log(`  ${c.green}✓ types are sound${c.reset}`);
+  if (!runCommand('npm run static-analysis:contract --silent')) {
+    fail('Type Safety', { command: 'static-analysis:contract' });
+  }
+  console.log(`  ${c.green}✓ types and static-analysis contract are sound${c.reset}`);
 }
 
 function lintConventions() {
@@ -185,7 +182,6 @@ function reactDiagnostics() {
 function main() {
   console.log(`${c.bold}Running Geeks FE quality gate (6 stages)...${c.reset}`);
 
-  // Auto-fix formatting/simple rules on staged files first (re-stages in place).
   if (staged.length > 0) {
     console.log(`\n${c.cyan}✨ Auto-fix (lint-staged)${c.reset}`);
     runCommand('npx lint-staged');
@@ -199,7 +195,6 @@ function main() {
   reactDiagnostics();
 
   console.log(`\n${c.green}${c.bold}✅ All quality gates passed.${c.reset}\n`);
-  // Clear any stale failure report.
   try {
     if (existsSync(FAIL_FILE)) writeFileSync(FAIL_FILE, JSON.stringify({ stage: null }, null, 2));
   } catch {
