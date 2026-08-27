@@ -34,7 +34,8 @@ You clone it, run one command, and you already have a professional, guarded proj
 ## 3. Before you start (prerequisites)
 
 - **Node.js 22 or newer** (check with `node --version`).
-- **npm** (comes with Node).
+- **pnpm** — the pinned version lives in `package.json`'s `packageManager` field; `corepack
+enable` picks it up automatically (Node 22 ships Corepack).
 - An editor: **VS Code**, **Cursor**, or **Claude Code** all work. AI features are a bonus, not a requirement.
 
 ---
@@ -42,14 +43,14 @@ You clone it, run one command, and you already have a professional, guarded proj
 ## 4. Get started (2 minutes)
 
 ```bash
-npm install      # installs everything + sets up the commit hooks + syncs AI commands
-npm run dev      # opens the app at http://localhost:5173 (fake data via MSW, no backend needed)
+pnpm install     # installs everything + sets up the commit hooks (never rewrites tracked files)
+pnpm dev         # opens the app at http://localhost:5173 (fake data via MSW, no backend needed)
 ```
 
 Before committing, you can run the full check yourself:
 
 ```bash
-npm run verify   # types + lint + format
+pnpm verify   # the canonical gate — guardrails + types + tests + lint + a11y + format + style + doctor + build
 ```
 
 There is **no real backend**. MSW (Mock Service Worker) answers all API calls in dev and tests,
@@ -60,7 +61,7 @@ so everything runs out of the box.
 ## 5. How it works (the everyday flow)
 
 ```
-   write code  ──►  git commit  ──►  Quality Gate runs (6 stages)
+   write code  ──►  git commit  ──►  Quality Gate runs (mostly staged-scoped)
                                         │
                           ┌─────────────┴─────────────┐
                           ▼                           ▼
@@ -70,12 +71,21 @@ so everything runs out of the box.
                      git push                  fix code, commit again
                           │
                           ▼
-                 GitHub CI re-runs the same checks (safety net)
+                 GitHub CI runs `pnpm verify` — all 11 checks, full-repo
 ```
 
-- The gate runs **locally** when you commit (via a Husky hook).
-- The **same** checks run again on **GitHub** (CI) after you push — so nothing bad reaches the team.
-- If a commit is blocked, read the message, fix the **code** (never disable the check), and commit again.
+`pnpm verify` is the single canonical definition of the gate — 11 checks, each its own
+`check:*`/`ai:check` script in `package.json` (see § 7). Every entry point runs the exact same
+rule set:
+
+- **Locally, on demand:** `pnpm verify` runs all 11, full-repo.
+- **Locally, on commit:** the Husky hook (`scripts/hooks/pre-commit.mjs`) runs most of them,
+  scoped to just your staged files, for speed — a couple (like the build) are whole-repo
+  concerns a staged scan can't meaningfully speed up, so they're `verify`/CI-only.
+- **On GitHub (CI):** `.github/workflows/quality-gate.yml` does nothing but `pnpm verify`.
+
+If a commit is blocked, read the message, fix the **code** (never disable the check), and
+commit again.
 
 ---
 
@@ -86,22 +96,43 @@ src/
   components/
     common/       Reusable UI (Button, Input, Dialog, Toaster, ThemeToggle, DataTable,
                   SearchInput, Can, …) — Radix + CVA, no business logic
-    features/     Whole screens/features — ExampleWidget (list/search) and Auth
-                  (login/signup/forgot-password/verify/reset); copy either to start one
-    layouts/      Page shells (AppLayout, AuthLayout, ErrorLayout, DashboardLayout)
-  hooks/          Generic reusable hooks (e.g. useDebouncedValue, useThemeSync)
+    auth/         Auth forms only (LoginForm, SignupForm, OtpForm, ForgotPasswordForm,
+                  ResetPasswordForm) — pages live in pages/auth/, see that folder's README
+    example/      ExampleWidget — the one example feature (list/search)
+    <role>/       Components scoped to one role's own pages (none ship by default)
+    layouts/      Page shells (AppLayout, AuthLayout, ErrorLayout, RoleLayout — renders the
+                  right shell for whichever role is signed in, driven by
+                  routes/ProtectedRoutes.tsx)
+  pages/
+    common/       Pages reachable by every role (HomePage, ForbiddenPage, ExamplePage, and
+                  the common routes every role's sidebar links to: Settings/Profile/
+                  Notifications — `roles: 'all'` in routes/ProtectedRoutes.tsx)
+    auth/         The 5 Auth pages (route-level glue only)
+    <role>/       Pages owned by one role — mirrors components/<role>/. Ships with two
+                  placeholders: member/ (ROLES.MEMBER) and admin/ (ROLES.ADMIN)
+  hooks/          Generic reusable hooks (e.g. useDebouncedValue, useThemeSync,
+                  useSyncAuthAcrossTabs)
   lib/            utils.ts — the cn() class-merge helper used by every common component
-  services/       api-client (Axios), queryClient, authService
+  services/       api-client (Axios, bearer attach + refresh-and-retry), queryClient,
+                  authService (real /auth contract)
   utils/          Pure helper functions (easy to unit-test)
   schemas/        Zod schemas (form + API validation); common.schema.ts for shared primitives
   types/          Shared TypeScript interfaces
   constants/      api-routes.ts, config.ts, env.ts (Zod-validated env)
   i18n/           i18next setup + locales/<lng>/common.json — the only source of text
-  router/         Routes (createBrowserRouter) + guards (RequireAuth, RequireRole)
-  stores/         Zustand stores (UI/client state); authStore is persist-backed
-  mocks/          MSW handlers (fake API, dev-time only)
+  routes/         roles.ts (the Role registry) + ProtectedRoutes.tsx (every protected page,
+                  its roles, its sidebar nav entry, plus getNavItemsForRole/
+                  getHomeRouteForRole/getRoleLayout) + PublicRoutes.tsx (the guest-only auth
+                  screens) + AppRouters.tsx (createBrowserRouter — generates every route
+                  from those two files) + AuthRedirectRoute.tsx + AuthenticatedRoute.tsx +
+                  RoleGuards.tsx (the per-route auth + role gate)
+  stores/         Zustand stores (UI/client state); authStore is persist-backed (holds
+                  accessToken/refreshToken/user/hasHydrated)
+  mocks/          MSW handlers.ts (shared fixtures) + browser.ts (dev worker) + server.ts
+                  (Node server, tests only — see § 7)
+  test/           setup.ts (Vitest setup) + renderWithProviders.tsx (test render helper)
 
-components.json                shadcn CLI config — `npx shadcn add <component>` to pull more
+components.json                shadcn CLI config — `pnpm dlx shadcn add <component>` to pull more
 scripts/hooks/pre-commit.mjs   The 6-stage quality gate
 scripts/sync-ai-config.mjs     Mirrors Claude commands → Cursor commands
 AGENTS.md                      THE rulebook (single source of truth)
@@ -114,51 +145,70 @@ docs/                          This guide, onboarding, deep-dive docs
 
 **Quick answers to "where does X go?"**
 
-| I want to add…          | Put it in…                                                    |
-| ----------------------- | ------------------------------------------------------------- |
-| A reusable button/input | `src/components/common/`                                      |
-| A whole screen/feature  | Copy `src/components/features/ExampleWidget/`, rename, gut it |
-| Data fetching           | A TanStack Query hook (never a raw `useEffect` fetch)         |
-| UI-only state           | A Zustand store                                               |
-| A form                  | React Hook Form + a Zod schema in `src/schemas/`              |
-| User-facing text        | A key in `src/i18n/locales/<lng>/common.json`, via `t()`      |
-| An API path             | `src/constants/api-routes.ts`                                 |
-| A pure helper           | `src/utils/`                                                  |
+| I want to add…          | Put it in…                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| A reusable button/input | `src/components/common/`                                                        |
+| A whole screen/feature  | Copy `src/components/example/` + `pages/common/ExamplePage.tsx`, rename, gut it |
+| Data fetching           | A TanStack Query hook (never a raw `useEffect` fetch)                           |
+| UI-only state           | A Zustand store                                                                 |
+| A form                  | React Hook Form + a Zod schema in `src/schemas/`                                |
+| User-facing text        | A key in `src/i18n/locales/<lng>/common.json`, via `t()`                        |
+| An API path             | `src/constants/api-routes.ts`                                                   |
+| A pure helper           | `src/utils/`                                                                    |
 
 ---
 
-## 7. The Quality Gate (6 stages)
+## 7. The Quality Gate — `pnpm verify` (11 checks)
 
-Every commit runs these, in order. Any failure blocks the commit:
+`pnpm verify` chains these 11 checks, each its own non-mutating `check:*`/`ai:check` script. Any
+failure blocks a merge — and, run staged-file-scoped via the commit hook, blocks a commit
+(except `check:test` — see the note below):
 
-1. **Guard Rails** — no `console.log`, secrets, `as any`, `eslint-disable`, merge markers, oversized files.
-2. **Type Safety** — TypeScript strict check (`tsc -b --noEmit`).
-3. **Lint & Conventions** — ESLint (React hooks rules, keys, no hardcoded text, design tokens only).
-4. **Accessibility** — strict `jsx-a11y` rules (WCAG 2.1 AA).
-5. **Style Consistency** — `impeccable detect` on staged `.tsx`/`.jsx`/`.css` files.
-6. **React Diagnostics** — `react-doctor --staged` (the Socket.dev supply-chain scan is skipped
-   here for commit speed; run `npm run doctor` for the full scan).
+1. `check:guardrails` — secrets, merge markers, `eslint-disable`, oversized files (console.log/
+   `as any`/TS-suppression comments moved to ESLint — see that script's own comment for why).
+2. `ai:check` — asserts `.cursor/commands/` hasn't drifted from `.claude/commands/` (the source
+   of truth — see § 11). Non-mutating; `ai:sync` is the command that actually fixes drift.
+3. `check:lint-contract` — asserts the strict ESLint rules and `tsconfig` options below haven't
+   silently regressed.
+4. `check:types` — TypeScript strict check (`tsc -b --noEmit`).
+5. `check:test` — `vitest run` (Vitest + React Testing Library). Runs right after types, before
+   the lint/format/style stages — a broken component matters more than a lint nit, and it
+   should block the expensive `check:build` step from even starting.
+6. `check:lint` — ESLint, on `tseslint.configs.strictTypeChecked` (React hooks rules, keys, no
+   hardcoded text, design tokens only).
+7. `check:a11y` — strict `jsx-a11y` rules (WCAG 2.1 AA).
+8. `check:format` — Prettier, check-only.
+9. `check:style` — `impeccable detect`.
+10. `check:doctor` — `react-doctor` (the Socket.dev supply-chain scan is skipped here for speed;
+    run `pnpm doctor` for the full scan).
+11. `check:build` — the production build succeeds.
 
-This boilerplate has no automated test framework by design (see `AGENTS.md` § Verifying a
-change) — verify a change by running it (`npm run dev`), not by writing a test.
+`check:test` isn't in the staged-files commit hook (`pnpm gate`) — like `ai:check`,
+`check:lint-contract`, and `check:build`, it runs full-repo as part of `pnpm verify`/CI instead
+(see AGENTS.md § The Quality Gate). See `AGENTS.md` § Testing for what to test, what to avoid,
+and the `pnpm test`/`pnpm test:run` commands.
 
-Run it manually anytime: `npm run gate`.
+Run the full thing anytime: `pnpm verify`. Run the staged-files-only version the commit
+hook uses: `pnpm gate`.
 
 ---
 
 ## 8. Everyday commands
 
-| Command                           | What it does                                        |
-| --------------------------------- | --------------------------------------------------- |
-| `npm run dev`                     | Start the dev server                                |
-| `npm run build` / `preview`       | Production build / preview it                       |
-| `npm run verify`                  | Full check: types + lint + format                   |
-| `npm run gate`                    | Run the 6-stage commit gate manually                |
-| `npm run lint` / `lint:check`     | ESLint auto-fix / check-only                        |
-| `npm run format` / `format:check` | Prettier write / check                              |
-| `npm run doctor`                  | React Doctor scan (React anti-patterns)             |
-| `npm run style:check`             | Impeccable scan (UI anti-patterns / design quality) |
-| `npm run sync:ai`                 | Rebuild `.cursor/commands` from `.claude/commands`  |
+| Command                      | What it does                                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                   | Start the dev server                                                                                                   |
+| `pnpm build` / `preview`     | Production build / preview it                                                                                          |
+| `pnpm verify`                | **The** canonical gate — all 11 checks, full-repo (see § 7)                                                            |
+| `pnpm gate`                  | Most of the same checks, scoped to staged files (what commit runs) — not `check:test`, see § 7                         |
+| `pnpm check:<name>`          | Run one check standalone (`guardrails`/`lint-contract`/`types`/`test`/`lint`/`a11y`/`format`/`style`/`doctor`/`build`) |
+| `pnpm test`                  | Vitest in watch mode, for local dev (not part of `verify` — `check:test` is)                                           |
+| `pnpm test:run`              | Vitest, single run (same as `check:test`; part of `verify`)                                                            |
+| `pnpm lint` / `format`       | Check-only, non-mutating (same as `check:lint`/`check:format`; part of `verify`)                                       |
+| `pnpm lint:fix`/`format:fix` | The mutating versions — actually write the fixes to disk                                                               |
+| `pnpm doctor`                | React Doctor full scan, incl. the Socket.dev supply-chain check (manual, not part of `verify`)                         |
+| `pnpm ai:sync`               | Rebuild `.cursor/commands` from `.claude/commands` (mutating)                                                          |
+| `pnpm ai:check`              | Verify `.cursor/commands` isn't stale (non-mutating; part of `verify`)                                                 |
 
 ---
 
@@ -166,7 +216,8 @@ Run it manually anytime: `npm run gate`.
 
 **Don't start from scratch — copy the example.**
 
-1. Copy `src/components/features/ExampleWidget/` to a new folder, e.g. `UserProfile/`.
+1. Copy `src/components/example/` to a new folder, e.g. `src/components/UserProfile/`, and
+   copy `src/pages/common/ExamplePage.tsx` for the matching thin route wrapper.
 2. Rename files and the component, then replace the logic with yours.
 3. It already wires up: typed props, a TanStack Query hook, a Zustand store, a form with Zod
    validation, full accessibility, and a README.
@@ -178,25 +229,26 @@ For a single reusable component instead, ask your AI tool for `/new-component`, 
 
 ## 10. The tools (what each one is for)
 
-| Tool                      | Job in this project                                         |
-| ------------------------- | ----------------------------------------------------------- |
-| **Vite**                  | Fast dev server + production builder                        |
-| **TypeScript (strict)**   | Type safety — catches bugs before runtime                   |
-| **React 18+**             | UI, function components + hooks only                        |
-| **Radix UI + CVA**        | Accessible UI primitives + variant styling (shadcn pattern) |
-| **React Router v7**       | Routing (data router)                                       |
-| **Tailwind CSS v4**       | Styling via design tokens in `src/index.css`                |
-| **Zustand**               | Client / UI state                                           |
-| **TanStack Query v5**     | Server state / data fetching + caching                      |
-| **React Hook Form + Zod** | Forms + validation (shared types)                           |
-| **Axios**                 | HTTP client with auth + error handling                      |
-| **i18next**               | All user-facing text — JSON-driven, mandatory (not opt-in)  |
-| **MSW**                   | Fake API for local dev — no backend needed to run the app   |
-| **ESLint + Prettier**     | Code rules + auto-formatting                                |
-| **Husky + lint-staged**   | Runs the gate automatically on commit                       |
-| **commitlint**            | Enforces Conventional Commit messages                       |
-| **React Doctor**          | Scans React code for state/effect/perf/security/a11y issues |
-| **Impeccable**            | Scans for UI anti-patterns & design-quality issues          |
+| Tool                         | Job in this project                                         |
+| ---------------------------- | ----------------------------------------------------------- |
+| **Vite**                     | Fast dev server + production builder                        |
+| **TypeScript (strict)**      | Type safety — catches bugs before runtime                   |
+| **React 18+**                | UI, function components + hooks only                        |
+| **Radix UI + CVA**           | Accessible UI primitives + variant styling (shadcn pattern) |
+| **React Router v7**          | Routing (data router)                                       |
+| **Tailwind CSS v4**          | Styling via design tokens in `src/index.css`                |
+| **Zustand**                  | Client / UI state                                           |
+| **TanStack Query v5**        | Server state / data fetching + caching                      |
+| **React Hook Form + Zod**    | Forms + validation (shared types)                           |
+| **Axios**                    | HTTP client with auth + error handling                      |
+| **i18next**                  | All user-facing text — JSON-driven, mandatory (not opt-in)  |
+| **MSW**                      | Fake API — browser worker in dev, Node server in tests      |
+| **Vitest + Testing Library** | Component/behavior tests — see AGENTS.md § Testing          |
+| **ESLint + Prettier**        | Code rules + auto-formatting                                |
+| **Husky + lint-staged**      | Runs the gate automatically on commit                       |
+| **commitlint**               | Enforces Conventional Commit messages                       |
+| **React Doctor**             | Scans React code for state/effect/perf/security/a11y issues |
+| **Impeccable**               | Scans for UI anti-patterns & design-quality issues          |
 
 ---
 
@@ -204,14 +256,15 @@ For a single reusable component instead, ask your AI tool for `/new-component`, 
 
 - **`AGENTS.md`** is the single rulebook. Cursor reads it natively; `CLAUDE.md` just imports it.
 - **Slash commands** are written once in `.claude/commands/` and mirrored to `.cursor/commands/`
-  by `npm run sync:ai`. Available: `/fix-commit`, `/new-component`, `/new-feature`,
+  by `pnpm ai:sync` — `pnpm ai:check` (part of `verify`) fails CI if you forget to run it.
+  Available: `/fix-commit`, `/new-component`, `/new-feature`,
   `/fe-api-guide`, `/a11y-audit`, `/perf-audit`, `/code-review`.
 - **Skills** (deeper playbooks) live in `.claude/skills/`; Cursor reads that folder too.
 
 Ask either tool "what are this project's component conventions?" → you get the **same answer**,
 because both read `AGENTS.md`.
 
-> Using plain VS Code (no AI)? Everything still works — the quality gate is just npm scripts.
+> Using plain VS Code (no AI)? Everything still works — the quality gate is just pnpm scripts.
 > The AI commands are a convenience, not a requirement.
 
 ---
@@ -223,7 +276,8 @@ Everything below is a small, safe edit. Commit it like any other change.
 ### Add a new AI slash command
 
 1. Create `.claude/commands/my-command.md` (add a short YAML frontmatter + instructions).
-2. Run `npm run sync:ai` — it appears in `.cursor/commands/` automatically.
+2. Run `pnpm ai:sync` — it appears in `.cursor/commands/` automatically. Commit both files
+   together; `pnpm ai:check` (part of `verify`) fails CI if the mirror is missing.
 
 ### Add a new AI skill (playbook)
 
@@ -238,7 +292,7 @@ Everything below is a small, safe edit. Commit it like any other change.
 ### Add or change a lint rule
 
 1. Edit `eslint.config.js`.
-2. Run `npm run lint:check` to confirm nothing unexpected breaks.
+2. Run `pnpm check:lint` to confirm nothing unexpected breaks.
 
 ### Change the look (colors, spacing, radius, fonts)
 

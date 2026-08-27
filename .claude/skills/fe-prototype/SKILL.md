@@ -11,9 +11,9 @@ does this table look like with 50 rows?") — it is not a first draft of the rea
 
 ## Rules
 
-- Build it under a route not wired into `router.tsx`'s exported `router` (e.g. a local
+- Build it under a route not wired into `AppRouters.tsx`'s exported `router` (e.g. a local
   dev-only entry, or a component rendered directly in a scratch file) — it must never ship.
-  Never add it to `src/router/router.tsx`.
+  Never add it to `src/routes/AppRouters.tsx`.
   It does not need tests, a README, or to pass `npm run gate` — it is explicitly exempt from
   the boilerplate's normal component conventions while it stays a prototype.
 - Use the real stack (Zustand/TanStack Query/RHF+Zod/Tailwind tokens) so the answer is

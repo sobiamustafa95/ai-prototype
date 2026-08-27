@@ -9,9 +9,13 @@ This is a **domain-agnostic boilerplate**, the starting point for every Geeks pr
 Two rules override everything else:
 
 1. **Zero business-domain lock-in.** Never invent products, orders, bookings, etc. The only
-   feature folders are `src/components/features/ExampleWidget` (a generic paginated/searchable
-   list) and `src/components/features/Auth` (login/signup/forgot-password/verify/reset —
-   the "day one" auth flow every real project needs) — both domain-agnostic on purpose.
+   non-common concern folders are `src/components/example` + `src/pages/common/ExamplePage.tsx`
+   (a generic paginated/searchable list), `src/components/auth` + `src/pages/auth` (login/
+   signup/forgot-password/verify/reset — the "day one" auth flow every real project needs),
+   and the two example roles in the role system (`src/routes/roles.ts`) — `MEMBER` (lifted
+   from the real backend contract's own example payload) and `ADMIN` — each with exactly one
+   placeholder page (`src/pages/member`, `src/pages/admin`), not a real feature — all
+   domain-agnostic on purpose.
 2. **Maximum guardrails on _how_ code is written** — enforced by tooling, not discipline.
 
 ---
@@ -22,7 +26,7 @@ Two rules override everything else:
 - **UI:** React 18+ function components + hooks only (no class components)
 - **UI primitives:** Radix UI + `class-variance-authority` (CVA), the shadcn/ui pattern —
   the base layer for **all** common components, not just complex ones. Add more via
-  `npx shadcn add <component>` (see `components.json`), then re-point its classes at our
+  `pnpm dlx shadcn add <component>` (see `components.json`), then re-point its classes at our
   own `@theme` tokens — never adopt shadcn's default `--primary`/`--secondary` CSS variables.
   `src/lib/utils.ts` exports the `cn()` class-merge helper every common component uses.
 - **Routing:** React Router v7 data router (`createBrowserRouter`)
@@ -32,9 +36,10 @@ Two rules override everything else:
 - **HTTP:** Axios typed client with interceptors (`src/services/api-client.ts`)
 - **Env validation:** Zod-validated `import.meta.env` (`src/constants/env.ts`) — fails loudly
   at startup on a missing/malformed env var instead of shipping a silent misconfiguration.
-- **Testing:** none by design — no Vitest/RTL, no coverage, no Storybook. Verify a change by
-  running it (`npm run dev`) and checking it against the feature/component it was meant to do.
-- **API mocking:** MSW (dev only, fake API responses for the app to hit)
+- **Testing:** Vitest + React Testing Library, jsdom environment (`vite.config.ts`'s `test`
+  block; see § Testing below). No coverage thresholds, no Storybook.
+- **API mocking:** MSW — `msw/browser` in dev (fake API responses for the app to hit),
+  `msw/node` in tests (`src/mocks/server.ts`), both built from the same `src/mocks/handlers.ts`
 - **Lint/format:** ESLint (flat config) + Prettier · **Hooks:** Husky + lint-staged + commitlint
 
 Do not substitute a stack choice without flagging it first.
@@ -49,23 +54,54 @@ src/
                           ConfirmDialog, DropdownMenu, Toaster, ThemeToggle, LoadingState,
                           ErrorState, EmptyState, FormField, SearchInput, Pagination,
                           DataTable, Seo, Can (inline role gate)
-  components/features/   Feature folders: ExampleWidget (generic list), Auth (login/signup/
-                          forgot-password/verify-otp/reset-password) — copy either to start one
-  components/layouts/    AppLayout, AuthLayout, ErrorLayout, DashboardLayout (sidebar+topbar)
-  hooks/                 Generic hooks (useDebouncedValue, useThemeSync); feature hooks live
-                          in their feature folder
+  components/auth/       Auth forms only: LoginForm, SignupForm, OtpForm, ForgotPasswordForm,
+                          ResetPasswordForm — pages that route to them live in src/pages/auth/
+  components/example/    ExampleWidget (the one example feature: generic paginated list)
+  components/<role>/     Components scoped to one role's own pages (see
+                          routes/ProtectedRoutes.tsx) — none ship by default (both example
+                          roles are placeholder pages with no role-specific components
+                          yet); add at this level, mirrored by src/pages/<role>/
+  components/layouts/    AppLayout, AuthLayout, ErrorLayout, RoleLayout (renders the right
+                          shell for whichever role is signed in — driven by
+                          routes/ProtectedRoutes.tsx, not a separate layout per role)
+  pages/common/          Pages reachable by every role: HomePage, ForbiddenPage, ExamplePage,
+                          and the common-route placeholders every role's sidebar links to —
+                          SettingsPage/ProfilePage/NotificationsPage (roles: 'all', registered
+                          in routes/ProtectedRoutes.tsx's COMMON_PROTECTED_ROUTES)
+  pages/auth/            The 5 Auth pages (route-level glue only — see components/auth/README)
+  pages/<role>/          Pages owned by one role — mirrors components/<role>/. Ships with
+                          two placeholders: member/ (ROLES.MEMBER) and admin/ (ROLES.ADMIN)
+  hooks/                 Generic hooks (useDebouncedValue, useThemeSync,
+                          useSyncAuthAcrossTabs); feature hooks live in their own folder
   lib/                   utils.ts (cn() class-merge helper for CVA/Radix components)
-  services/              api-client.ts, authService.ts (stub), queryClient.ts
+  services/              api-client.ts (bearer attach + refresh-and-retry), authService.ts
+                          (real /auth contract), queryClient.ts
   utils/                 Pure functions only (100% unit-testable)
   schemas/               Zod schemas (forms + API contracts); common.schema.ts for
                           shared primitives (email/password/phone/url)
   types/                 Shared TS interfaces (types MAY be barrel-exported)
   constants/             api-routes.ts, config.ts, env.ts (validated env)
-  router/                router.tsx (createBrowserRouter), guards (RequireAuth, RequireRole),
-                          DashboardRoute/ForbiddenRoute placeholders
+  routes/                roles.ts (the Role registry), ProtectedRoutes.tsx (every protected
+                          page + which roles may reach it + its sidebar nav entry, plus
+                          getNavItemsForRole/getHomeRouteForRole/getRoleLayout),
+                          PublicRoutes.tsx (the guest-only auth screens), AppRouters.tsx
+                          (createBrowserRouter — generates every <Route> from those two
+                          files), AuthRedirectRoute.tsx (keeps a signed-in user off the
+                          public auth screens), AuthenticatedRoute.tsx (auth-only gate —
+                          wraps RoleLayout itself around the whole protected group so an
+                          unauthenticated visitor never sees a flash of its chrome, and
+                          doubles as a standalone gate for a route outside the registry),
+                          RoleGuards.tsx (the per-route auth + role gate `AppRouters.tsx`
+                          wraps every protected route in) — page components live in
+                          src/pages/, not here
   stores/                Zustand stores, one file per domain slice (authStore is
-                          persist-backed; themeStore drives light/dark/system)
-  mocks/                 MSW handlers + browser worker setup (dev-time fake API)
+                          persist-backed, holds accessToken/refreshToken/user/hasHydrated;
+                          themeStore drives light/dark/system)
+  mocks/                 MSW handlers.ts (shared fixtures) + browser.ts (dev-time worker) +
+                          server.ts (Node server, tests only — see § Testing)
+  test/                  setup.ts (Vitest setup: jest-dom matchers, MSW server lifecycle,
+                          matchMedia/Pointer Capture stubs) + renderWithProviders.tsx (fresh
+                          QueryClient + MemoryRouter per test) — see § Testing
   i18n/                  i18next setup (index.ts) + locales/<lng>/common.json — the
                           only source of user-facing text, see § Data & State below
 ```
@@ -76,12 +112,29 @@ Where things go — quick answers for "where does X go?":
   Tech Stack). Simple presentational pieces don't need Radix — only reach for a Radix
   primitive when the component needs real interaction/accessibility behavior (focus
   trapping, portals, roving tabindex) that's error-prone to hand-roll.
-- A screen/feature → **copy** `features/ExampleWidget` (a data-driven list/search screen) or
-  `features/Auth` (a multi-page form flow), whichever shape is closer, rename, gut the logic.
-- A protected/role-gated area → wrap the route in `RequireAuth`/`RequireRole`
-  (`src/router/guards.tsx`) and put UI-level gating on a piece of content with `Can`
-  (`src/components/common/Can.tsx`); `DashboardLayout` + `DashboardRoute` are the reference
-  shape for a sidebar-based protected section.
+- A screen/feature → **copy** `components/example/` + `pages/common/ExamplePage.tsx` (a
+  data-driven list/search screen) or `components/auth/` + `pages/auth/` (a multi-page form
+  flow), whichever shape is closer, rename, gut the logic. A component that isn't
+  role-specific gets its own folder at `components/<concern>/` (same level as `common/`);
+  a role-specific one gets `components/<role>/`, mirrored by `pages/<role>/`.
+- A new role, or a route only some roles may reach → this is the **role system**
+  (`src/routes/ProtectedRoutes.tsx`), not a one-off guard. Three steps, in order: add the
+  role to `src/routes/roles.ts`'s `ROLES`; add its own routes to `ProtectedRoutes.tsx`
+  (`roles: [ROLES.X]`, plus `nav: { labelKey, end? }` on any route that should appear in
+  the sidebar) and its entry in that same file's `ROLE_LAYOUT` map (reuse
+  `variant: 'sidebar'` unless it needs a visually different shell); add its pages under
+  `src/pages/<role>/`. A route every role should reach (e.g. the shipped settings/profile/
+  notifications pages) goes in `ProtectedRoutes.tsx`'s `COMMON_PROTECTED_ROUTES` instead
+  (`roles: 'all'`) — registered once, it shows up in every role's sidebar automatically, no
+  per-role nav file to touch. No router, guard, or layout code changes — `AppRouters.tsx`
+  generates every protected `<Route>` from `PROTECTED_ROUTES`, wrapping each one in
+  `RoleGuards` (`src/routes/RoleGuards.tsx`) with that route's own `roles`, and `RoleLayout`
+  (`src/components/layouts/RoleLayout.tsx`) reads the shell + nav for the signed-in role
+  from the same file. See `pages/member/` (`ROLES.MEMBER`) and `pages/admin/`
+  (`ROLES.ADMIN`) for the reference shape. For a one-off protected route deliberately kept
+  outside the registry, `AuthenticatedRoute`/`AuthRedirectRoute` (`src/routes/`) are still
+  there standalone. `Can` (`src/components/common/Can.tsx`) is the separate inline-UI-level
+  gate (hide/show a fragment of an already-rendered page).
 - Data fetching → a TanStack Query hook (never a raw `useEffect` fetch). Failures toast
   automatically via `queryClient.ts`; opt out per-call with `meta: { skipErrorToast: true }`.
 - UI-only state → a Zustand store (feature-scoped when feature-specific).
@@ -155,7 +208,7 @@ Where things go — quick answers for "where does X go?":
   never after an `await mutateAsync(...)`, which runs even mid-navigation/unmount.
 - **Client/UI state:** Zustand, one slice per domain; feature UI state lives in the feature
   folder. Auth state (`authStore.ts`) is `persist`-backed — it is the single source of truth
-  for the bearer token; nothing else touches `localStorage` for it directly.
+  for the access/refresh token pair; nothing else touches `localStorage` for it directly.
 - **Forms:** React Hook Form + `zodResolver`; share Zod types between form + API. Reuse a
   primitive from `src/schemas/common.schema.ts` (email/password/phone/url) instead of
   redefining validation inline when one already covers the field.
@@ -166,9 +219,11 @@ Where things go — quick answers for "where does X go?":
   `{ error, path }`, not `{ message, path }` (v3). Build create/update/filter schema variants
   off one base with `.extend()`/`.pick()`/`.omit()`/`.partial()` — never re-declare fields.
 - The Axios client (`api-client.ts`) owns auth-token attach and error normalization
-  (`ApiError`); on a 401 it clears the auth store and lets the router redirect (hard-logout,
-  not a silent refresh — see `docs/auth-token-refresh.md` if a project genuinely needs the
-  latter). Do not create ad-hoc `fetch`/`axios` instances.
+  (`ApiError`); on a 401 from any non-auth-flow route it runs a single-flight
+  refresh-and-retry (see `docs/auth-token-refresh.md` — the pattern documented there is the
+  default here, not opt-in, because this boilerplate's access token is genuinely short-lived).
+  A failed refresh, or a second 401 after retrying, clears the auth store and lets the router
+  redirect. Do not create ad-hoc `fetch`/`axios` instances.
 
 ---
 
@@ -205,20 +260,79 @@ something you verify by reading the markup and trying the keyboard/a screen read
 
 ---
 
-## Verifying a change
+## Testing
 
-This boilerplate has **no automated test framework** — no Vitest, no React Testing
-Library, no Playwright. That's a deliberate choice to keep the boilerplate lean; a project
-built on it is free to add one back (Vitest + RTL is the natural fit for this stack) once
-there's enough surface area to justify it.
+Vitest + React Testing Library (`@testing-library/react`, `@testing-library/user-event`,
+`@testing-library/jest-dom`), jsdom environment — configured in `vite.config.ts`'s `test`
+block (one config file for dev/build and tests, so plugins/aliases never drift apart) and
+`src/test/setup.ts` (jest-dom matchers, the MSW node server lifecycle, a `matchMedia` +
+Pointer Capture/`scrollIntoView` stub for jsdom — Radix needs the latter). `describe`/`it`/
+`expect`/`vi` are globals (`test.globals: true` + `"types": ["vitest/globals"]` in
+`tsconfig.app.json`) — no per-file import needed.
 
-Until then, verify a change the direct way:
+- `pnpm test` — watch mode, for local dev.
+- `pnpm test:run` — single run, CI-safe (exits instead of watching).
+- `pnpm check:test` — the gate's non-mutating wrapper around `test:run`; part of `pnpm verify`
+  (runs right after `check:types`, before the lint/format/style stages — a broken workflow is
+  a more valuable signal to fail fast on than a lint nit, and it should block before the
+  expensive `check:build` step even starts).
 
-- Run it: `npm run dev`, exercise the actual feature/component you touched.
-- Lean on the gate for everything mechanical — types, lint, accessibility lint, style
-  consistency, React Doctor — that's what stages 2–6 exist for (see § Quality Gate).
-- For anything the gate can't see (does the flow actually make sense, does the API call
-  return what you expect), check it by hand before committing.
+**Philosophy: workflow/integration-level testing, not isolated component unit-testing.**
+This repo does not unit-test individual primitives (`Button`, `Input`, `Dialog`, `ThemeToggle`,
+etc.) — they're shadcn/Radix-pattern components, already battle-tested upstream; a click/focus
+test on `Button` alone proves nothing about whether the app actually works. Instead, every test
+exercises a real user-facing flow — button click → form/modal → submit → success/error/cancel
+— through the components that flow actually uses, so a primitive gets its coverage
+transitively, through every workflow that touches it, not from a standalone unit test of its
+own. `src/components/common/` never has its own `*.test.tsx` files.
+
+Two kinds of test, two different naming/location rules:
+
+1. **Feature workflow tests** — `<Name>.workflow.test.tsx`, co-located inside the feature's
+   own folder (`src/components/example/ExampleWidget.workflow.test.tsx` is the reference —
+   copy its shape for a new feature, same as copying the feature's code). The `.workflow.`
+   in the name is deliberate: it marks "this is an end-to-end flow test," not a unit test, at
+   a glance. A feature that splits into multiple pieces (e.g. `AddManagerModal.tsx`,
+   `EditManagerModal.tsx`) gets one `<Piece>.workflow.test.tsx` per piece, in that same
+   feature folder — never a separate parallel test-only folder. Cover the real flow: initial
+   load, the primary interaction (search/submit/toggle/...), and its success/empty/error/
+   cancel edge cases — through Testing Library queries (`getByRole`/`getByLabelText`, not
+   `getByTestId` or DOM internals) driven by real `@testing-library/user-event` interactions,
+   and through the real MSW-backed network layer (`src/mocks/handlers.ts` via `msw/node`'s
+   `setupServer`, `src/mocks/server.ts`) — never an inline mock of `apiClient`/`fetch`. Add a
+   new scenario to `handlers.ts` when a workflow genuinely needs the backend to respond a new
+   way (e.g. a duplicate-email 409); reach for `server.use(...)` inside the test only for a
+   one-off override that isn't worth a permanent fixture. Reuse
+   `src/test/renderWithProviders.tsx` for anything touching TanStack Query or react-router
+   context — a fresh `QueryClient` per test (never the app's shared singleton, which would
+   leak cached queries between tests) inside a `MemoryRouter`.
+2. **Service/hook tests** — `*.test.ts`, co-located next to the file, for `src/services/`
+   and `src/hooks/`. This is reusable logic multiple features depend on (the axios
+   interceptors, `authService`, generic hooks), so it's tested standalone rather than only
+   incidentally through whichever workflow happens to exercise it. Services still go through
+   real MSW handlers (never a direct `apiClient`/axios mock) — `src/services/api-client.test.ts`
+   and `authService.test.ts` are the reference shape. Hooks use React Testing Library's
+   `renderHook` (`@testing-library/react`); a hook with a timer uses `vi.useFakeTimers()` +
+   `vi.advanceTimersByTime(...)`, never a real `setTimeout` wait — `useDebouncedValue.test.ts`
+   is the reference shape.
+
+**What to avoid:** a standalone test for a `src/components/common/` primitive; testing
+implementation details (state variable names, internal hook call counts, snapshot tests of
+markup); reaching for `getByTestId` when a role/label query works; a separate a11y-assertion
+library — RTL's role-based queries already fail loudly when an element isn't accessibly
+named, which is most of the signal a dedicated a11y-in-tests tool would add on top.
+
+**No coverage reporting or thresholds** — not configured, not a target to chase. Add one
+later as its own decision, not a side effect of adding tests.
+
+Building a new feature (`fe-component-scaffold` skill, `/new-feature`)? Copy
+`src/components/example/`'s `ExampleWidget.workflow.test.tsx` alongside its component and
+adapt it — the workflow test is part of the reference shape to copy, not a follow-up step.
+
+Beyond automated tests, verify a change by running it too: `pnpm dev`, exercise the actual
+feature/component you touched, and lean on the rest of the gate (`pnpm verify`) for
+everything mechanical — types, lint, accessibility lint, format, style consistency, React
+Doctor, the build (see § Quality Gate).
 
 ---
 
@@ -247,22 +361,131 @@ Subject: lower-case start, no trailing period, ≤ 72 chars. Example:
 
 ---
 
-## The Quality Gate (blocks the commit — 6 stages)
+## The Quality Gate — one canonical contract: `pnpm verify`
 
-`scripts/hooks/pre-commit.mjs`, run by Husky, on staged files:
+`pnpm verify` is **the** definition of "ready to merge." It chains eleven checks, each its
+own non-mutating `check:*`/`ai:check` script in `package.json`, always run full-repo:
 
-1. **Guard Rails** — no `console.*`, secrets, merge markers, `as any`, `eslint-disable`, oversized files.
-2. **Type Safety** — `tsc -b --noEmit` (strict).
-3. **Lint & Conventions** — ESLint (hooks, `jsx-key`, prop types, hardcoded text, tokens).
-4. **Accessibility** — strict `jsx-a11y` pass.
-5. **Style Consistency** — `impeccable detect` on staged `.tsx`/`.jsx`/`.css` files.
-6. **React Diagnostics** — `react-doctor --staged` (supply-chain/Socket.dev scan skipped for
-   commit speed; run `npm run doctor` for the full scan including that check).
+1. `check:guardrails` — secrets, merge markers, `eslint-disable`, oversized files (rule set
+   lives in `scripts/checks/guard-rails.mjs`). Deliberately narrow: `console.*`, `as any`, and
+   `@ts-ignore`/`@ts-expect-error`/`@ts-nocheck` used to be regex-checked here too, but ESLint
+   now catches all three more reliably (AST-based, not regex) — see that file's own comment
+   for exactly which rule replaced which check.
+2. `ai:check` — asserts `.cursor/commands/` matches what `pnpm ai:sync` would generate from
+   `.claude/commands/`, without writing anything (`scripts/checks/ai-config-contract.mjs`,
+   sharing its comparison logic with `scripts/sync-ai-config.mjs` so the two can't define "in
+   sync" differently) — see § Checks vs Fixes.
+3. `check:lint-contract` — asserts the specific ESLint rule severities and `tsconfig.*.json`
+   compiler options this section documents haven't silently regressed (`scripts/checks/
+lint-config-contract.mjs`) — the guard against someone downgrading a rule to turn a red
+   `verify` green instead of fixing the code that tripped it.
+4. `check:types` — `tsc -b --noEmit` (strict; see this section's TypeScript/ESLint strictness
+   bullets below for exactly how strict).
+5. `check:test` — `vitest run` (see § Testing). Placed right after `check:types` and before
+   the lint/format/style stages: a broken component is a more valuable signal to catch early
+   than a lint nit, and it should block before `check:build` (the most expensive stage) even
+   starts, not after.
+6. `check:lint` — ESLint (hooks, `jsx-key`, prop types, hardcoded text, tokens).
+7. `check:a11y` — strict `jsx-a11y` pass.
+8. `check:format` — Prettier, check-only.
+9. `check:style` — `impeccable detect` (`< /dev/null` — see § Non-interactive by design below).
+10. `check:doctor` — `react-doctor` (`--no-supply-chain` skips the Socket.dev scan for speed,
+    run `pnpm doctor` for the full scan including that check; `--yes` — see below). **Only
+    `error`-severity findings fail this check.** `doctor.config.ts` sets `blocking: 'error'`
+    (react-doctor's own default), so a warning-only finding — e.g. this boilerplate's own
+    `query-mutation-missing-invalidation` warnings on `signup`/`forgotPassword`/etc., a
+    documented, deliberate exception (see § Data & State's Mutations bullet) — shows up in the
+    output and lowers the score, but does **not** fail `check:doctor`, `verify`, or CI. This is
+    intentional, not a gap: warnings are advisory. Run `pnpm exec react-doctor --blocking warning`
+    to audit warnings as if they were blocking, but that is not what `verify`/CI enforce.
+11. `check:build` — the production build succeeds.
 
-Run the full gate manually with `npm run verify`. CI re-runs it on every PR, so
-`--no-verify` is an emergency escape hatch only — **it still fails CI.**
+**TypeScript/ESLint strictness.** Both `tsconfig.app.json`/`tsconfig.node.json` and
+`eslint.config.js` run the strongest maintained preset each tool ships, not a relaxed subset:
+
+- `eslint.config.js` extends `tseslint.configs.strictTypeChecked` (not
+  `recommendedTypeChecked`) and `reactHooks.configs.flat.recommended` (not the two
+  hand-maintained hook rules this repo used to pin manually) — both auto-pick-up new rules
+  the maintainers add, instead of drifting from upstream.
+- These rules are escalated to `error` over their preset default: `react-hooks/exhaustive-deps`,
+  `@typescript-eslint/no-floating-promises`, `@typescript-eslint/no-misused-promises`,
+  `@typescript-eslint/await-thenable`, `react/display-name`, `react/no-unescaped-entities`,
+  `react-refresh/only-export-components`. `check:lint-contract` (above) is what keeps these
+  honest — see that script for the exact list and how to document a genuine exception instead
+  of silently downgrading one.
+- `@typescript-eslint/ban-ts-comment` bans `@ts-expect-error` unconditionally (not the rule's
+  own default of "allowed with a description") to match this file's § Never Do.
+- `@typescript-eslint/restrict-template-expressions` allows numbers (`allowNumber: true`) —
+  the one narrow, documented relaxation off `strictTypeChecked`'s defaults, because
+  `` `${count}` `` is always a safe, unambiguous string (unlike objects/`any`/nullish, which
+  strictTypeChecked still bans there).
+- `tsconfig.app.json` and `tsconfig.node.json` both set `exactOptionalPropertyTypes` and
+  `noPropertyAccessFromIndexSignature`, and both carry the identical strict-family compiler
+  options — the node-tooling project (`vite.config.ts`, `doctor.config.ts`, `scripts/`) is
+  held to the same bar as the app project, not a looser one.
+
+**CI** (`.github/workflows/quality-gate.yml`) does nothing but
+`pnpm install --frozen-lockfile && pnpm verify` — no separate, hand-duplicated step list to
+drift out of sync with what you ran locally.
+
+**`scripts/hooks/pre-commit.mjs`**, run by Husky on every commit, runs the **same** checks —
+never a different rule set — scoped to just the staged files, for commit speed. Most tools
+take a file list or a native staged-scan flag (ESLint, Impeccable, React Doctor's `--staged`);
+Guard Rails has no such CLI, so its logic lives once in `scripts/checks/guard-rails.mjs` and
+both `check:guardrails` (full-repo) and the pre-commit stage (staged-only) import the same
+`guardRails()` function. `ai:check`, `check:lint-contract`, `check:test`, and `check:build`
+don't have staged-scoped pre-commit stages — config drift, a broken build, and (with today's
+small suite) the cost of running Vitest full-repo rather than trying to scope it to staged
+files are whole-repo concerns, not something a per-file staged scan would catch meaningfully
+faster. The test suite still blocks every `pnpm verify` run and CI — just not every commit.
+
+A green `pnpm verify` locally **is** the same contract pre-commit and CI enforce — there is
+no longer a way for it to pass while the hook or CI fails. `--no-verify` is an emergency escape
+hatch only — **it still fails CI.**
+
+**Non-interactive by design.** Both `check:style` and `check:doctor` are pinned to flags that
+guarantee zero prompts, in a real terminal or in CI:
+
+- `check:style` (`impeccable detect`) has no `--yes`/`--ci` flag — its only prompt (a
+  "Continue?" confirmation past 50 files) is gated purely on `process.stdin.isTTY`, so the
+  script redirects stdin from `/dev/null` to force that false everywhere. (`--quiet`/`--json`
+  would also suppress it, but both throw away the per-file detail needed to fix a failure.)
+- `check:doctor` (`react-doctor`) passes **two** things, for two different prompts:
+  - `--yes`, its documented "skip prompts" flag — covers prompts inside its plain-text report
+    path (e.g. an ambiguous workspace-project selection).
+  - `< /dev/null` — required separately, because `--yes` does **not** cover react-doctor's
+    post-scan interactive menu ("Choose how to continue", which can offer to launch Claude
+    Code in Bypass Permissions mode). That menu is a full ink TUI app, gated by its own
+    `shouldUseTui()` check (`src/cli/utils/should-use-tui.ts` in the react-doctor package),
+    which never looks at `flags.yes` — it only looks at whether stdin/stdout are a real TTY,
+    the Node version, the terminal type, and whether `--score`/`--json`/`--json-compact`/
+    `--json-out`/`--staged`/`--changed-files-from` was passed. Redirecting stdin from
+    `/dev/null` trips the `!stdinIsTty` branch of that check, so the TUI (and its menu) never
+    launches — the plain-text report path runs instead, same as every other check.
+  - `scripts/hooks/pre-commit.mjs`'s React Diagnostics stage does **not** need either of these
+    stdin tricks — it already passes `--staged`, which is itself one of the flags in
+    `shouldUseTui()`'s exclusion list, so the TUI is already unreachable there. Don't add
+    `< /dev/null` to that stage "for consistency" — it's already immune, and the extra
+    redirect would just be dead weight.
+
+Never remove these flags to "see the interactive menu" in a script that runs unattended
+(`verify`, `gate`, CI) — run `pnpm doctor` or `pnpm exec impeccable detect src/` directly instead.
 
 ---
+
+## Checks vs Fixes
+
+Every bare command a person or an agent runs to _investigate_ something (`pnpm lint`,
+`pnpm format`, `pnpm verify`, any `pnpm check:*`, `pnpm ai:check`) only reports — it never
+writes to disk. Mutation is always a separate, explicitly-named command: `pnpm lint:fix`,
+`pnpm format:fix`, `pnpm ai:sync`. A fresh `pnpm install` follows the same rule — `prepare`
+only runs `husky` (git-hook setup), so installing dependencies never rewrites a tracked file
+either. The one deliberate exception is `lint-staged`, wired into the pre-commit hook: it
+auto-fixes **staged** files on commit, same as always — that mutation is intended, scoped to
+files you're about to commit anyway, and is not what this section is about.
+
+Rule of thumb: if a command's name doesn't end in `:fix` and isn't `ai:sync`, it's safe to run
+blind — on someone else's branch, in CI, from a script — without checking `git diff` first.
 
 ## Never Do (in the boilerplate or any project built on it)
 
@@ -288,8 +511,9 @@ Run the full gate manually with `npm run verify`. CI re-runs it on every PR, so
 
 - Rules are defined **only here** — `docs/GUIDE.md` explains them at greater length, never
   redefines them.
-- Commands: author once in `.claude/commands/*.md`; `npm run sync:ai` mirrors them to
-  `.cursor/commands/` (frontmatter stripped). Set: `/fix-commit`, `/fe-api-guide`,
+- Commands: author once in `.claude/commands/*.md`; `pnpm ai:sync` mirrors them to
+  `.cursor/commands/` (frontmatter stripped) — `pnpm ai:check` (part of `verify`) fails CI if
+  a source file changed without a re-sync. Set: `/fix-commit`, `/fe-api-guide`,
   `/new-component`, `/new-feature`, `/a11y-audit`, `/perf-audit`, `/code-review`.
 - Skills live once in `.claude/skills/` (Cursor loads this folder too). Set: `fe-fix-commit`,
   `fe-api-guide`, `fe-component-scaffold`, `fe-a11y-audit`, `fe-prototype`, `fe-debug`.

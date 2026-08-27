@@ -28,7 +28,12 @@ export function ThemeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as Theme)}>
+        <DropdownMenuRadioGroup
+          value={theme}
+          onValueChange={(value) => {
+            setTheme(value as Theme);
+          }}
+        >
           {(Object.keys(THEME_LABELS) as Theme[]).map((value) => (
             <DropdownMenuRadioItem key={value} value={value}>
               {THEME_LABELS[value]}

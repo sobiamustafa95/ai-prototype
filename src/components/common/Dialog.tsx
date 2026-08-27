@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ElementRef, ReactNode } from 'react';
+import type { ComponentPropsWithoutRef, ComponentRef, ReactNode } from 'react';
 import { forwardRef } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from 'src/lib/utils';
@@ -35,7 +35,7 @@ type DialogContentProps = Omit<
 };
 
 export const DialogContent = forwardRef<
-  ElementRef<typeof DialogPrimitive.Content>,
+  ComponentRef<typeof DialogPrimitive.Content>,
   DialogContentProps
 >(function DialogContent({ className, children, dialogTitle, ...rest }, ref) {
   return (
