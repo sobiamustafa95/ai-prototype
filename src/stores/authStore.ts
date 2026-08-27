@@ -1,42 +1,67 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AuthUser } from 'src/types';
+import type { AuthTokens, AuthUser } from 'src/types';
 import { authService } from 'src/services/authService';
+import { queryClient } from 'src/services/queryClient';
 import { CONFIG } from 'src/constants/config';
 
 interface AuthState {
   user: AuthUser | null;
-  token: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   status: 'idle' | 'authenticating' | 'authenticated' | 'error';
   error: string | null;
+  /** False until zustand/persist has finished reading localStorage (see guards.tsx). */
+  hasHydrated: boolean;
   login: (credentials: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
-  /** Internal — used by src/services/api-client.ts to persist a token it wrote. */
-  setToken: (token: string | null) => void;
+  logoutAllDevices: () => Promise<void>;
+  /** Internal — used by src/services/api-client.ts to persist a rotated token pair. */
+  setTokens: (tokens: AuthTokens) => void;
   /** Completes a session from a non-login flow (e.g. OTP verification finishing signup). */
-  setSession: (user: AuthUser, token: string) => void;
+  setSession: (user: AuthUser, tokens: AuthTokens) => void;
+  /** Internal — called by `onRehydrateStorage` once persisted state has been read back. */
+  setHasHydrated: (value: boolean) => void;
+}
+
+function clearSession(): void {
+  useAuthStore.setState({
+    user: null,
+    accessToken: null,
+    refreshToken: null,
+    status: 'idle',
+  });
+  // authStore -> queryClient -> api-client -> authStore is a safe cycle here: every
+  // read/call happens inside a callback (never at module-eval time), matching the
+  // same pattern api-client.ts documents for its own authStore import.
+  queryClient.clear();
 }
 
 /**
  * Auth client-state slice. One store per domain slice — never a single global store.
- * `token` is the single source of truth for the bearer token (api-client.ts reads
- * it via `useAuthStore.getState().token` rather than touching localStorage itself);
- * `persist` is what survives a reload, matching the pattern our real projects
- * converge on (CarnectionIQ, Glassatecture, Solar-lead all persist auth through
- * their state store rather than a bare localStorage key).
+ * `accessToken`/`refreshToken` are the single source of truth for the session
+ * (api-client.ts reads/writes them via `useAuthStore.getState()`/`setTokens`
+ * rather than touching localStorage itself); `persist` is what survives a reload.
  */
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      token: null,
+      accessToken: null,
+      refreshToken: null,
       status: 'idle',
       error: null,
+      hasHydrated: false,
       async login(credentials) {
         set({ status: 'authenticating', error: null });
         try {
-          const { user, token } = await authService.login(credentials);
-          set({ user, token, status: 'authenticated' });
+          const { user, tokens } = await authService.login(credentials);
+          set({
+            user,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            status: 'authenticated',
+          });
         } catch (error) {
           set({
             status: 'error',
@@ -45,19 +70,43 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       async logout() {
-        await authService.logout();
-        set({ user: null, token: null, status: 'idle' });
+        await authService.logout().catch(() => {});
+        clearSession();
       },
-      setToken(token) {
-        set({ token });
+      async logoutAllDevices() {
+        await authService.logoutAllDevices().catch(() => {});
+        clearSession();
       },
-      setSession(user, token) {
-        set({ user, token, status: 'authenticated', error: null });
+      setTokens(tokens) {
+        set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
+      },
+      setSession(user, tokens) {
+        set({
+          user,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          status: 'authenticated',
+          error: null,
+        });
+      },
+      setHasHydrated(value) {
+        set({ hasHydrated: value });
       },
     }),
     {
       name: CONFIG.AUTH_STORE_NAME,
-      partialize: (state) => ({ user: state.user, token: state.token }),
+      partialize: (state) => ({
+        user: state.user,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+      }),
+      // Calls the method on the rehydrated `state` object itself rather than the
+      // `useAuthStore` module binding — for a synchronous storage (localStorage),
+      // this callback can fire before `export const useAuthStore = ...` finishes
+      // assigning, and referencing that binding here would throw (TDZ).
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

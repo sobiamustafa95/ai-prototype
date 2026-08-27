@@ -11,36 +11,43 @@ concurrency:
 
 jobs:
   gate:
-    name: Type, Lint, Style, Build
+    name: Verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      # Reads the pinned version from package.json's "packageManager" field —
+      # keep that field as the single source of truth, don't also pin a version here.
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm ci
 
       - name: Static-analysis contract
-        run: npm run static-analysis:contract
+        run: pnpm static-analysis:contract
 
       - name: Type check
-        run: npm run typecheck
+        run: pnpm check:types
 
       - name: Lint
-        run: npm run lint:check
+        run: pnpm check:lint
 
       - name: Accessibility lint (strict jsx-a11y)
-        run: npx eslint --config eslint.a11y.config.js "src/**/*.tsx" --max-warnings=0
+        run: pnpm check:a11y
 
       - name: Format check
-        run: npm run format:check
+        run: pnpm check:format
 
       - name: Style check (Impeccable — opt-in)
-        run: npm run style:check
+        run: pnpm check:style
 
-      - name: Build
-        run: npm run build
+      # Single canonical check — guard rails, types, tests, lint, a11y, format,
+      # style, react-doctor, build. Same command developers run locally; the
+      # pre-commit hook runs a staged-files-scoped subset for commit speed.
+      - name: Verify
+        run: pnpm verify

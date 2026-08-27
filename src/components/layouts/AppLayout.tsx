@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from 'src/components/common/ThemeToggle';
 import { useAuthStore } from 'src/stores/authStore';
+import { getHomeRouteForRole } from 'src/routes/ProtectedRoutes';
 
 const navLinkClassName = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium ${isActive ? 'text-brand-600' : 'text-foreground-muted'}`;
@@ -31,7 +32,10 @@ export function AppLayout() {
                   </li>
                 ))}
                 <li>
-                  <NavLink to={user ? '/dashboard' : '/login'} className={navLinkClassName}>
+                  <NavLink
+                    to={user ? getHomeRouteForRole(user.role) : '/login'}
+                    className={navLinkClassName}
+                  >
                     {user ? t('NAV_DASHBOARD') : t('NAV_LOGIN')}
                   </NavLink>
                 </li>

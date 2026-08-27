@@ -75,10 +75,16 @@ export default tseslint.config(
     },
   },
 
-  // Base JS + TS strict, type-checked rules. strictTypeChecked is intentionally chosen
-  // for this starter so AI-authored code receives the strongest practical static feedback.
+  // Base JS + TS (type-checked) sets. `strictTypeChecked` (not `recommendedTypeChecked`)
+  // is the strongest maintained preset typescript-eslint ships — see AGENTS.md §
+  // The Quality Gate for the audit that confirmed this repo is clean against it.
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
+
+  // Maintained "recommended" flat config (not the newer, still-experimental
+  // "recommended-latest" React Compiler rule set) — replaces hand-maintained
+  // react-hooks rules so new rules the plugin adds are picked up automatically.
+  reactHooks.configs.flat.recommended,
 
   {
     files: ['**/*.{ts,tsx}'],
@@ -155,10 +161,21 @@ export default tseslint.config(
       '@typescript-eslint/no-misused-promises': 'error',
       // Boilerplate must be a clean example of its own rules: no escape hatches.
       '@typescript-eslint/no-non-null-assertion': 'error',
-      '@typescript-eslint/ban-ts-comment': 'error',
+      // Default options allow `@ts-expect-error` with a description; AGENTS.md bans
+      // it unconditionally (§ Never Do), so require every variant to be banned —
+      // this makes ESLint a strict superset of guard-rails.mjs's old regex check,
+      // which is why that check was removed (see guard-rails.mjs's own comment).
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        { 'ts-expect-error': true, 'ts-ignore': true, 'ts-nocheck': true, 'ts-check': false },
+      ],
       // React Router's documented 404 pattern is `throw new Response(...)` from a
       // loader (isRouteErrorResponse checks for that exact shape, not `instanceof Error`).
       '@typescript-eslint/only-throw-error': ['error', { allow: [{ from: 'lib', name: 'Response' }] }],
+      // strictTypeChecked's default bans every non-string type in a template
+      // expression, including numbers — but `${count}` always stringifies to a
+      // sensible, unambiguous value (unlike objects/any/nullish, which stay banned).
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
 
       // ---- Guard rails ----
       'no-console': 'error',
@@ -215,6 +232,16 @@ export default tseslint.config(
       'react/jsx-no-literals': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-floating-promises': 'off',
+    },
+  },
+
+  // Test files: the hardcoded-text rule exists to keep *shipped* UI copy out of
+  // i18n's reach, not to force test fixtures/assertions (button labels, typed
+  // values, expected strings) through translation keys.
+  {
+    files: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'react/jsx-no-literals': 'off',
     },
   },
 

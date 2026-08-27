@@ -6,7 +6,8 @@ import { cn } from 'src/lib/utils';
 
 interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label: ReactNode;
-  error?: string;
+  // See Input.tsx's `error` prop doc — same reason for `| undefined`.
+  error?: string | undefined;
   hint?: ReactNode;
 }
 
@@ -31,7 +32,9 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           size="sm"
           className="absolute top-7 right-1 px-2"
           aria-label={toggleLabel}
-          onClick={() => setVisible((current) => !current)}
+          onClick={() => {
+            setVisible((current) => !current);
+          }}
         >
           {toggleLabel}
         </Button>

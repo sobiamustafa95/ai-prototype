@@ -2,87 +2,137 @@ import { apiClient } from 'src/services/api-client';
 import { API_ROUTES } from 'src/constants/api-routes';
 import type { ApiResponse, AuthTokens, AuthUser } from 'src/types';
 
+interface Session {
+  user: AuthUser;
+  tokens: AuthTokens;
+}
+
 /**
- * Auth stub — demonstrates the full login/signup/forgot-password/verify/reset
- * pattern against MSW handlers. There is no real backend; swap the MSW handlers
- * for real endpoints per project. Token persistence is owned by authStore.ts.
+ * Auth API client — one method per `/auth/*` endpoint (see docs/fe-api-guide.md's
+ * Auth section for the full contract this mirrors). Every call here just posts/
+ * gets and unwraps `response.data.data`: a non-2xx response never reaches this
+ * file because `api-client.ts`'s response interceptor already turned it into a
+ * thrown `ApiError` (including the refresh-and-retry dance on an expired access
+ * token) before axios resolves. Token persistence is owned by authStore.ts.
  */
 export const authService = {
-  async login(credentials: {
+  /** Creates the account; the server sends a signup-verification OTP. */
+  async signup(payload: {
+    name: string;
     email: string;
+    phone: string;
     password: string;
-  }): Promise<{ user: AuthUser; token: string }> {
-    const { data } = await apiClient.post<ApiResponse<{ user: AuthUser; tokens: AuthTokens }>>(
-      API_ROUTES.AUTH.LOGIN,
-      credentials
-    );
-    if (data.status !== 'success' || !data.data) {
-      throw new Error(data.error ?? 'Login failed');
-    }
-    return { user: data.data.user, token: data.data.tokens.accessToken };
+  }): Promise<void> {
+    await apiClient.post<ApiResponse<boolean>>(API_ROUTES.AUTH.SIGNUP, payload);
   },
 
+  /** Verifies the signup OTP — activates the account and starts a session. */
+  async verifySignupOtp(payload: { email: string; otp: string }): Promise<Session> {
+    const { data } = await apiClient.post<ApiResponse<Session>>(
+      API_ROUTES.AUTH.VERIFY_SIGNUP_OTP,
+      payload
+    );
+    return data.data;
+  },
+
+  async resendSignupOtp(payload: { email: string }): Promise<void> {
+    await apiClient.post<ApiResponse<boolean>>(API_ROUTES.AUTH.RESEND_SIGNUP_OTP, payload);
+  },
+
+  async login(credentials: { email: string; password: string }): Promise<Session> {
+    const { data } = await apiClient.post<ApiResponse<Session>>(API_ROUTES.AUTH.LOGIN, credentials);
+    return data.data;
+  },
+
+  /** Exchanges a refresh token for a rotated pair. Called by api-client.ts's 401 handling. */
+  async refreshToken(refreshToken: string): Promise<AuthTokens> {
+    const { data } = await apiClient.post<ApiResponse<AuthTokens>>(API_ROUTES.AUTH.REFRESH_TOKEN, {
+      refreshToken,
+    });
+    return data.data;
+  },
+
+  /** Emails a signup-style OTP for password reset. */
+  async forgotPassword(payload: { email: string }): Promise<void> {
+    await apiClient.post<ApiResponse<boolean>>(API_ROUTES.AUTH.FORGOT_PASSWORD, payload);
+  },
+
+  /** Verifies the forgot-password OTP, returning a single-use reset token. */
+  async verifyForgotPasswordOtp(payload: {
+    email: string;
+    otp: string;
+  }): Promise<{ resetToken: string }> {
+    const { data } = await apiClient.post<ApiResponse<{ resetToken: string }>>(
+      API_ROUTES.AUTH.VERIFY_FORGOT_PASSWORD_OTP,
+      payload
+    );
+    return data.data;
+  },
+
+  /** Alternate entry point: emails a reset link instead of an OTP. Not wired to a page. */
+  async forgotPasswordLink(payload: { email: string }): Promise<void> {
+    await apiClient.post<ApiResponse<boolean>>(API_ROUTES.AUTH.FORGOT_PASSWORD_LINK, payload);
+  },
+
+  /** Sets a new password using the reset token from either OTP or link flow. */
+  async verifyResetPassword(payload: { token: string; password: string }): Promise<void> {
+    await apiClient.post<ApiResponse<boolean>>(API_ROUTES.AUTH.VERIFY_RESET_PASSWORD, payload);
+  },
+
+  /** Sign in with Apple. Implemented for parity with the API; no page consumes it yet. */
+  async appleCallback(payload: { idToken: string }): Promise<Session> {
+    const { data } = await apiClient.post<ApiResponse<Session>>(
+      API_ROUTES.AUTH.APPLE_CALLBACK,
+      payload
+    );
+    return data.data;
+  },
+
+  async getAuthenticatedUser(): Promise<AuthUser> {
+    const { data } = await apiClient.get<ApiResponse<AuthUser>>(API_ROUTES.AUTH.ME);
+    return data.data;
+  },
+
+  /**
+   * Changes the password for the current session. Succeeding revokes every
+   * session (including this one) — not wired to a page yet, see
+   * components/auth/README.md for what a project adding a settings page needs.
+   */
+  async changePassword(payload: { currentPassword: string; newPassword: string }): Promise<void> {
+    await apiClient.post<ApiResponse<boolean>>(API_ROUTES.AUTH.CHANGE_PASSWORD, payload);
+  },
+
+  /** Ends the current session (identified from the access token, no body needed). */
   async logout(): Promise<void> {
     await apiClient.post(API_ROUTES.AUTH.LOGOUT);
   },
 
-  async me(): Promise<AuthUser> {
-    const { data } = await apiClient.get<ApiResponse<AuthUser>>(API_ROUTES.AUTH.ME);
-    if (data.status !== 'success' || !data.data) {
-      throw new Error(data.error ?? 'Not authenticated');
-    }
+  /** Ends every session for the current user. Not wired to a page yet. */
+  async logoutAllDevices(): Promise<void> {
+    await apiClient.post(API_ROUTES.AUTH.LOGOUT_ALL_DEVICES);
+  },
+
+  /** Lists this user's live sessions. Not wired to a page yet. */
+  async activeSessions(): Promise<
+    Array<{
+      _id: string;
+      deviceInfo: string;
+      ipAddress: string;
+      createdAt: string;
+      expiresAt: string;
+    }>
+  > {
+    const { data } = await apiClient.get<
+      ApiResponse<
+        Array<{
+          _id: string;
+          deviceInfo: string;
+          ipAddress: string;
+          createdAt: string;
+          expiresAt: string;
+        }>
+      >
+    >(API_ROUTES.AUTH.ACTIVE_SESSIONS);
     return data.data;
-  },
-
-  /** Creates the account; the server sends a verification code (see `verifyOtp`). */
-  async signup(payload: { name: string; email: string; password: string }): Promise<void> {
-    const { data } = await apiClient.post<ApiResponse<null>>(API_ROUTES.AUTH.SIGNUP, payload);
-    if (data.status !== 'success') {
-      throw new Error(data.error ?? 'Signup failed');
-    }
-  },
-
-  /** Completes signup verification; logs the user in on success. */
-  async verifyOtp(payload: {
-    email: string;
-    code: string;
-  }): Promise<{ user: AuthUser; token: string }> {
-    const { data } = await apiClient.post<ApiResponse<{ user: AuthUser; tokens: AuthTokens }>>(
-      API_ROUTES.AUTH.VERIFY_OTP,
-      payload
-    );
-    if (data.status !== 'success' || !data.data) {
-      throw new Error(data.error ?? 'Verification failed');
-    }
-    return { user: data.data.user, token: data.data.tokens.accessToken };
-  },
-
-  async resendOtp(payload: { email: string }): Promise<void> {
-    const { data } = await apiClient.post<ApiResponse<null>>(API_ROUTES.AUTH.RESEND_OTP, payload);
-    if (data.status !== 'success') {
-      throw new Error(data.error ?? 'Could not resend the code');
-    }
-  },
-
-  /** Triggers a password-reset code to the given email. */
-  async forgotPassword(payload: { email: string }): Promise<void> {
-    const { data } = await apiClient.post<ApiResponse<null>>(
-      API_ROUTES.AUTH.FORGOT_PASSWORD,
-      payload
-    );
-    if (data.status !== 'success') {
-      throw new Error(data.error ?? 'Could not send the reset code');
-    }
-  },
-
-  /** Completes a password reset with the emailed code. */
-  async resetPassword(payload: { email: string; code: string; password: string }): Promise<void> {
-    const { data } = await apiClient.post<ApiResponse<null>>(
-      API_ROUTES.AUTH.RESET_PASSWORD,
-      payload
-    );
-    if (data.status !== 'success') {
-      throw new Error(data.error ?? 'Could not reset the password');
-    }
   },
 };

@@ -25,6 +25,8 @@
     "noUncheckedIndexedAccess": true,
     "noPropertyAccessFromIndexSignature": true,
     "noUncheckedSideEffectImports": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
 
     "jsx": "react-jsx",
     "moduleResolution": "bundler",
@@ -41,7 +43,9 @@
     "baseUrl": ".",
     "paths": {
       "src/*": ["src/*"]
-    }
+    },
+
+    "types": ["vitest/globals"]
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "build", "src/**/*.stories.tsx"]

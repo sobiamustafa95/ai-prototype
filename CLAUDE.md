@@ -14,4 +14,5 @@
   same rules explained end to end. Read one of the two before writing or editing any component.
 - Never run `git commit --no-verify` on the developer's behalf. Never add `eslint-disable`
   or `as any` to make the gate pass — fix the underlying code.
-- After changing any `.claude/commands/*.md`, run `npm run sync:ai` so Cursor's mirror stays current.
+- After changing any `.claude/commands/*.md`, run `pnpm ai:sync` so Cursor's mirror stays current
+  (`pnpm ai:check` — part of `pnpm verify` — fails CI if you forget).

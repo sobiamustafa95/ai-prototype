@@ -15,5 +15,8 @@ Create in `src/components/<target>/`:
 
 - `<ComponentName>.tsx` — typed props interface, single named export, full a11y, tokens only.
 
+No test file for a `common`/`layouts` component on its own — this repo tests at the workflow
+level (see `AGENTS.md` § Testing), not by unit-testing individual primitives.
+
 No barrel export. No hardcoded strings — add a key to `src/i18n/locales/<lng>/common.json`
-and read it with `useTranslation()`'s `t('KEY')`. Then run `npm run verify`.
+and read it with `useTranslation()`'s `t('KEY')`. Then run `pnpm verify`.

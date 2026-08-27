@@ -43,7 +43,9 @@ export function SearchInput({
       onChange={(event) => {
         const next = event.target.value;
         globalThis.clearTimeout(timeoutRef.current);
-        timeoutRef.current = globalThis.setTimeout(() => onChange(next), delayMs);
+        timeoutRef.current = globalThis.setTimeout(() => {
+          onChange(next);
+        }, delayMs);
       }}
       {...rest}
     />

@@ -26,8 +26,13 @@ export function ConfirmDialog({
   onOpenChange,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
+  // Radix's own `open`/`onOpenChange` props are typed `boolean | undefined`-free
+  // (plain `open?: boolean`), so passing `undefined` explicitly — which is what
+  // omitting these on ConfirmDialog produces after destructuring — doesn't
+  // type-check under exactOptionalPropertyTypes. Spread them in only when set,
+  // which is also the behavior Radix itself expects for uncontrolled mode.
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog {...(open !== undefined ? { open, onOpenChange } : {})}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent dialogTitle={title}>
         {description && <p className="text-foreground-muted mb-4 text-sm">{description}</p>}

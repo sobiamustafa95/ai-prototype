@@ -8,9 +8,9 @@ by discipline.
 ## Quick start
 
 ```bash
-npm install     # installs deps, Husky hooks, and mirrors AI commands
-npm run dev      # http://localhost:5173 — runs with MSW-mocked data, no backend needed
-npm run verify   # full quality gate; run before every commit
+pnpm install   # installs deps + sets up Husky hooks (never rewrites tracked files)
+pnpm dev       # http://localhost:5173 — runs with MSW-mocked data, no backend needed
+pnpm verify    # full quality gate; run before every commit
 ```
 
 New here? Read **[`docs/GUIDE.md`](./docs/GUIDE.md)** — the complete A–Z guide (what this is, how
@@ -22,9 +22,9 @@ in **[`AGENTS.md`](./AGENTS.md)**.
 
 Vite · TypeScript (strict) · React 18+ (function components only) · React Router v7 (data
 router) · Tailwind CSS v4 (`@theme` tokens) · Zustand · TanStack Query v5 · React Hook Form +
-Zod · Axios · i18next (JSON-driven, mandatory for all text) · MSW (dev-time API mocking) ·
-ESLint (flat) + Prettier · Husky + lint-staged + commitlint. No automated test framework by
-design — see `AGENTS.md` § Verifying a change.
+Zod · Axios · i18next (JSON-driven, mandatory for all text) · MSW (browser worker in dev,
+Node server in tests) · Vitest + React Testing Library · ESLint (flat) + Prettier · Husky +
+lint-staged + commitlint. See `AGENTS.md` § Testing for what to test and what to avoid.
 
 ## Project layout
 
@@ -40,39 +40,43 @@ See `AGENTS.md` § Directory Map for what belongs where.
 
 ## The quality gate (blocks the commit)
 
-`scripts/hooks/pre-commit.mjs` runs 6 stages on staged files, and CI re-runs the same checks:
-
-1. **Guard Rails** — no `console.*`, secrets, merge markers, `as any`, `eslint-disable`, big files
-2. **Type Safety** — `tsc -b --noEmit` (strict)
-3. **Lint & Conventions** — ESLint (hooks, `jsx-key`, prop types, hardcoded text, tokens)
-4. **Accessibility** — strict `jsx-a11y` (WCAG 2.1 AA)
-5. **Style Consistency** — `impeccable detect` (staged `.tsx`/`.jsx`/`.css`)
-6. **React Diagnostics** — `react-doctor --staged`
+`pnpm verify` is the single canonical check — 11 checks (guard rails, AI-command sync,
+lint-config-contract, types, tests, lint, a11y, format, style, React Doctor, build), each its
+own `check:*`/`ai:check` script, always full-repo and non-mutating. CI runs nothing but that
+same command. `scripts/hooks/pre-commit.mjs` runs most of these on every commit, scoped to
+just the staged files for speed — same rule set, not a different one (a couple, like the build
+and the test suite, are whole-repo concerns a staged scan can't meaningfully speed up). See
+`AGENTS.md` § The Quality Gate for the full breakdown, and § Checks vs Fixes for which
+commands are safe to run blind.
 
 `--no-verify` is an emergency escape hatch only — **it still fails CI.**
 
 ## Scripts
 
-| Script                                      | Does                                                    |
-| ------------------------------------------- | ------------------------------------------------------- |
-| `npm run dev` / `build` / `preview`         | Vite dev / prod build / preview                         |
-| `npm run verify`                            | Full gate: typecheck + lint + format                    |
-| `npm run gate`                              | Run the 6-stage pre-commit gate manually                |
-| `npm run typecheck` / `lint` / `lint:check` | Types / ESLint fix / ESLint check                       |
-| `npm run format` / `format:check`           | Prettier write / check                                  |
-| `npm run sync:ai`                           | Regenerate `.cursor/commands/` from `.claude/commands/` |
-| `npm run doctor` / `style:check`            | React Doctor / Impeccable (opt-in)                      |
+| Script                           | Does                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `pnpm dev` / `build` / `preview` | Vite dev / prod build / preview                                                                           |
+| `pnpm verify`                    | **The** canonical gate — all 11 checks, full-repo                                                         |
+| `pnpm gate`                      | Run most of the same checks scoped to staged files (pre-commit) — not `check:test`, see `AGENTS.md`       |
+| `pnpm check:<name>`              | Run one check standalone — see `AGENTS.md` for the list of 11                                             |
+| `pnpm test` / `test:run`         | Vitest watch mode / single run (`test:run` is what `check:test` runs)                                     |
+| `pnpm lint` / `format`           | Check-only, non-mutating (part of `verify`)                                                               |
+| `pnpm lint:fix` / `format:fix`   | The mutating versions — write the fixes to disk                                                           |
+| `pnpm ai:sync`                   | Regenerate `.cursor/commands/` from `.claude/commands/` (mutating)                                        |
+| `pnpm ai:check`                  | Verify `.cursor/commands/` isn't stale (non-mutating; part of `verify`)                                   |
+| `pnpm doctor`                    | React Doctor full scan, including the Socket.dev supply-chain check (manual/opt-in, not part of `verify`) |
 
 ## How AI tooling works here (Cursor ⇄ Claude Code)
 
 One source of truth: **`AGENTS.md`**. Cursor reads it natively; `CLAUDE.md` imports it;
 `.cursor/rules/*.mdc` only add glob-scoped pointers. Slash commands are authored once in
-`.claude/commands/` and mirrored to `.cursor/commands/` by `npm run sync:ai`. Deeper playbooks
+`.claude/commands/` and mirrored to `.cursor/commands/` by `pnpm ai:sync` (checked by `pnpm
+ai:check`, part of `verify`, so a forgotten sync fails CI). Deeper playbooks
 are Agent Skills in `.claude/skills/` (Cursor reads that folder too). Ask either tool "what are
 this project's component conventions?" and you get the same answer, because both read `AGENTS.md`.
 
 ## Domain-agnostic by design
 
 Nothing assumes what the app does. The only example feature is
-`src/components/features/ExampleWidget/` — **copy it, rename it, gut the logic** to start a real
-feature. See `docs/onboarding.md` for the day-one workflow.
+`src/components/example/ExampleWidget.tsx` — **copy its folder, rename it, gut the logic** to
+start a real feature. See `docs/onboarding.md` for the day-one workflow.

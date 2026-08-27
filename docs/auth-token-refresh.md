@@ -1,22 +1,23 @@
-# Optional pattern: silent single-flight token refresh
+# Silent single-flight token refresh
 
-**Status: not implemented by default.** `src/services/api-client.ts` hard-logs-out on a
-401 (clears the auth store, lets the router redirect via `RequireAuth`). This is what
-three of our four real projects do in production (CarnectionIQ, Glow-Tech, Solar-lead all
-just end the session on 401 — none of them implement a working refresh flow). Only
-`glassatecture-fe` (a Next.js project) has one, and its implementation is solid enough to
-document here as a reference for the rare project that actually needs it (e.g. a long-lived
-session product where forcing a re-login on every access-token expiry would hurt UX).
+**Status: implemented by default.** `src/services/api-client.ts` runs this exact pattern in
+its response interceptor. It's the default here — unlike most of our other real projects
+(CarnectionIQ, Glow-Tech, Solar-lead all just end the session on 401, no refresh flow) —
+because this boilerplate's backend contract issues a genuinely short-lived (15-minute)
+access token; forcing a full re-login every 15 minutes would be a poor default UX. A project
+whose backend issues longer-lived tokens is free to rip this back out for a plain
+hard-logout-on-401, which is the simpler default those other projects use.
 
-## Why hard-logout is the default
+## Why this is the default here
 
-- It's what actually ships in most of our projects — the boilerplate should match reality,
-  not aspire past it.
-- A refresh flow adds real complexity (single-flight coordination, a request queue, retry
-  wiring, more surface for auth bugs) that isn't worth carrying by default in a
-  domain-agnostic starting point.
-- If a project needs it, the pattern below is a complete, working reference — copy it in
-  deliberately rather than inheriting unused complexity everywhere else.
+- The access token's 15-minute lifetime makes hard-logout-on-401 a bad UX default — a user
+  would be forced to re-authenticate multiple times per hour.
+- `glassatecture-fe` (a Next.js project) already runs this pattern in production, so it's a
+  proven reference, not a novel design.
+- The refresh token **rotates** on every use (see `docs/fe-api-guide.md`), which is exactly
+  the scenario single-flight coordination exists to guard against — without it, concurrent
+  401s would each fire their own refresh, race, and the loser would replay an already-spent
+  refresh token, logging the user out everywhere.
 
 ## The pattern (adapted from `glassatecture-fe`)
 
@@ -82,11 +83,20 @@ session product where forcing a re-login on every access-token expiry would hurt
 4. **Force-logout on refresh failure** — if `requestRefresh()` comes back empty, clear the
    auth store and redirect, exactly like the hard-logout default does today.
 
-## Adapting it into this boilerplate
+## How this boilerplate actually implements it
 
-- Write `token` through `useAuthStore.getState().setToken(...)` (already exposed on the
-  store, see `src/stores/authStore.ts`), not a bare localStorage write.
-- Keep the queue/flag module-private to `api-client.ts` — don't put it in a store.
-- Verify it by hand: trigger two requests that 401 at nearly the same time and confirm
-  `requestRefresh()` only fires once (log it, or watch the network tab) — this boilerplate
-  has no automated test framework to assert it for you.
+`src/services/api-client.ts` uses a shared in-flight `Promise<string>` instead of the
+queue-array shape above (same single-flight guarantee, fewer moving parts):
+
+- Both tokens from a refresh are written back via `useAuthStore.getState().setTokens(...)` —
+  writing only the new access token would leave a spent refresh token in storage, which trips
+  the backend's stolen-token/reuse detection on the very next refresh.
+- `AUTH_FLOW_ROUTES` (derived from `API_ROUTES.AUTH`, excluding `ME`/`CHANGE_PASSWORD`) is the
+  exclusion list — a 401 on any of those means bad credentials/OTP/token, not an expired
+  access token.
+- On refresh failure, `useAuthStore.getState().logout()` runs — same cleanup a manual logout
+  does (clears the store, clears the TanStack Query cache) — and `RoleGuards`
+  (`src/routes/RoleGuards.tsx`) redirects.
+- Verify it by hand: trigger two requests that 401 at nearly the same time and confirm the
+  Network tab shows exactly one `/auth/refresh-token` call — this boilerplate has no automated
+  test framework to assert it for you.

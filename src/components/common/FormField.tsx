@@ -7,7 +7,7 @@ interface FormFieldProps {
   /** Render prop so the field can wrap any control (Select, checkbox group, ...),
    * not just a plain `<input>` — use the common `Input`/`PasswordInput` directly
    * for those, this is for a control that doesn't already manage its own label. */
-  children: (ids: { fieldId: string; describedBy?: string }) => ReactNode;
+  children: (ids: { fieldId: string; describedBy?: string | undefined }) => ReactNode;
 }
 
 /**
