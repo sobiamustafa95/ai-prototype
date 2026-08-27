@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { emailSchema, passwordSchema, phoneSchema } from 'src/schemas/common.schema';
+import { emailSchema, passwordSchema } from 'src/schemas/common.schema';
 import i18n from 'src/i18n';
 
 /** Login form schema — generic auth stub, no product assumptions. */
@@ -15,7 +15,6 @@ export const signupSchema = z
   .object({
     name: z.string().trim().min(1, i18n.t('FORM_REQUIRED')),
     email: emailSchema,
-    phone: phoneSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
   })
@@ -38,13 +37,10 @@ export const otpSchema = z.object({
 
 export type OtpValues = z.infer<typeof otpSchema>;
 
-/**
- * The backend resolves the account from the reset token itself (see
- * docs/fe-api-guide.md: "There is no `email` field on `verify-reset-password`")
- * — the token is carried through route state/search params, not this schema.
- */
 export const resetPasswordSchema = z
   .object({
+    email: emailSchema,
+    code: z.string().regex(/^\d{6}$/, i18n.t('FORM_INVALID_OTP')),
     password: passwordSchema,
     confirmPassword: z.string(),
   })

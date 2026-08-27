@@ -1,4 +1,4 @@
-<!-- AUTO-GENERATED from .claude/commands — edit the source, then run `pnpm ai:sync`. -->
+<!-- AUTO-GENERATED from .claude/commands — edit the source, then run `npm run sync:ai`. -->
 
 Generate frontend API integration documentation for the spec at: $ARGUMENTS
 

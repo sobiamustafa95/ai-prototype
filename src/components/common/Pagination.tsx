@@ -17,9 +17,7 @@ export function Pagination({ page, pageCount, onPageChange }: PaginationProps) {
         variant="secondary"
         size="sm"
         disabled={page <= 1}
-        onClick={() => {
-          onPageChange(page - 1);
-        }}
+        onClick={() => onPageChange(page - 1)}
       >
         {t('BUTTON_PREVIOUS')}
       </Button>
@@ -31,9 +29,7 @@ export function Pagination({ page, pageCount, onPageChange }: PaginationProps) {
         variant="secondary"
         size="sm"
         disabled={page >= pageCount}
-        onClick={() => {
-          onPageChange(page + 1);
-        }}
+        onClick={() => onPageChange(page + 1)}
       >
         {t('BUTTON_NEXT')}
       </Button>

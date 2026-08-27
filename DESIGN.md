@@ -125,7 +125,7 @@ body font first when re-skinning.
 
 Density is compact by default (`--spacing: 0.25rem` base unit, Tailwind's spacing
 scale multiplies from there). No fixed max-width container is imposed — layouts
-(`AppLayout`, `RoleLayout`, `AuthLayout`) each define their own shell.
+(`AppLayout`, `DashboardLayout`, `AuthLayout`) each define their own shell.
 
 ## Elevation & Depth
 
@@ -166,7 +166,7 @@ the default for buttons/inputs/cards) → `lg`/`xl` (0.75–1rem, dialogs/large 
 
 ### Navigation
 
-- Sidebar/topbar (`RoleLayout`) uses `surface`/`surface-muted` for the active-item
+- Sidebar/topbar (`DashboardLayout`) uses `surface`/`surface-muted` for the active-item
   state, never a shadow or heavy border to indicate selection — background contrast only.
 
 ## Do's and Don'ts

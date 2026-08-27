@@ -6,7 +6,7 @@ description: Use when creating a new React component or feature folder. Starts b
 # Scaffolding a component or feature
 
 Authoritative conventions: `AGENTS.md` § Component Conventions and § Directory Map.
-Reference implementation: `src/components/example/`.
+Reference implementation: `src/components/features/ExampleWidget/`.
 
 Every component built through this skill goes through three steps, in order:
 **1) identity → 2) reference check → 3) build.** Don't skip straight to code.
@@ -17,9 +17,8 @@ Before writing anything, confirm out loud (or ask if not given):
 
 - **Name** — PascalCase, specific to what it does (not `Card2` or `Wrapper`).
 - **Feature/purpose** — one sentence: what it's for and where it lives
-  (`src/components/common/<Name>/` for a reusable primitive, `src/components/<concern>/`
-  for a non-portal-specific feature screen/flow — e.g. `auth/`, `example/` — or
-  `src/components/<portal>/` for one scoped to a single portal/area).
+  (`src/components/common/<Name>/` for a reusable primitive, or
+  `src/components/features/<Name>/` for a feature screen/flow).
 - **Reusability shape** — what varies per caller (variants, sizes, content via `children`,
   data via props) vs what's fixed. A component hardcoded to one call site's copy or data
   is not done — push anything caller-specific into props.
@@ -67,32 +66,18 @@ Ask a follow-up: _"Should I design it, or will you provide a screenshot/descript
   `useTranslation()`'s `t('KEY')` — never a hardcoded string, never a default-parameter
   value (a hook can't sit in a default-parameter position — resolve `prop ?? t('KEY')`
   inside the function body instead).
-- **No test file for this component on its own.** This repo tests at the workflow level,
-  not the isolated-primitive level — a common primitive gets exercised through whichever
-  feature workflow test(s) actually use it, not a standalone unit test of its own. See
-  `AGENTS.md` § Testing.
 
-Verify by running it (`npm run dev`) too, checking it against the identity/reusability
-decided in Step 1.
+This boilerplate has no automated test framework — verify a component by running it
+(`npm run dev`) and checking it against the identity/reusability decided in Step 1, not
+by writing a test file.
 
-### A feature (`src/components/<concern-or-portal>/<Name>/`)
+### A feature (`src/components/features/<Name>/`)
 
-Copy `src/components/example/` and rename; gut the logic. Keep:
+Copy `ExampleWidget/` and rename; gut the logic. Keep:
 
 - `<Name>.tsx` (component), `use<Name>*.ts` (TanStack Query hook, Zod-validated),
   `<name>Store.ts` (feature-scoped Zustand UI state, if needed), and a **required**
   `README.md` (what it does, key components, state approach, API dependency).
-- `<Name>.workflow.test.tsx`, co-located, **mandatory** for a feature — copy
-  `ExampleWidget.workflow.test.tsx`'s shape and adapt it to this feature's real flow (load →
-  interact → success/empty/error), through `renderWithProviders` and the real MSW-backed
-  network layer (`src/mocks/handlers.ts` — add a scenario there if the feature's backend can
-  respond in a new way a test needs, never an inline mock bypassing MSW). A feature that
-  splits into multiple pieces (e.g. `AddXModal`, `EditXModal`) gets one
-  `<Piece>.workflow.test.tsx` per piece, in the same folder — never a separate parallel test
-  folder. See `AGENTS.md` § Testing for the full scope/naming rules.
-
-Add the matching thin route wrapper in `src/pages/common/<Name>Page.tsx` (or
-`src/pages/<portal>/` for a portal-specific feature) — see `src/pages/README.md`.
 
 ## Never
 

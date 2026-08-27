@@ -21,12 +21,8 @@ export function useThemeSync(): void {
 
     const media = globalThis.matchMedia('(prefers-color-scheme: dark)');
     applyThemeClass(media.matches);
-    const listener = (event: MediaQueryListEvent) => {
-      applyThemeClass(event.matches);
-    };
+    const listener = (event: MediaQueryListEvent) => applyThemeClass(event.matches);
     media.addEventListener('change', listener);
-    return () => {
-      media.removeEventListener('change', listener);
-    };
+    return () => media.removeEventListener('change', listener);
   }, [theme]);
 }

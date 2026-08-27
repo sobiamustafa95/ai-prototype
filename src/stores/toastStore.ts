@@ -4,9 +4,7 @@ export type ToastVariant = 'error' | 'success' | 'info';
 
 export interface ToastItem {
   id: string;
-  // `| undefined`, not just `?`, because every `toast.*` helper below always
-  // passes `title` through from its own optional parameter, present or not.
-  title?: string | undefined;
+  title?: string;
   description: string;
   variant: ToastVariant;
 }
@@ -35,13 +33,10 @@ export const useToastStore = create<ToastState>((set) => ({
 
 /** Convenience callers for non-component code (interceptors, query-cache handlers). */
 export const toast = {
-  error: (description: string, title?: string) => {
-    useToastStore.getState().add({ description, title, variant: 'error' });
-  },
-  success: (description: string, title?: string) => {
-    useToastStore.getState().add({ description, title, variant: 'success' });
-  },
-  info: (description: string, title?: string) => {
-    useToastStore.getState().add({ description, title, variant: 'info' });
-  },
+  error: (description: string, title?: string) =>
+    useToastStore.getState().add({ description, title, variant: 'error' }),
+  success: (description: string, title?: string) =>
+    useToastStore.getState().add({ description, title, variant: 'success' }),
+  info: (description: string, title?: string) =>
+    useToastStore.getState().add({ description, title, variant: 'info' }),
 };

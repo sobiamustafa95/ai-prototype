@@ -10,9 +10,9 @@ interface CanProps {
 }
 
 /**
- * Inline UI-level permission gate — complements the route-level `RoleGuards`
- * guard (`src/routes/RoleGuards.tsx`) for hiding/showing a piece of UI *within*
- * an already-rendered page, rather than blocking the whole route.
+ * Inline UI-level permission gate — complements the route-level `RequireRole`
+ * guard (`src/router/guards.tsx`) for hiding/showing a piece of UI *within* an
+ * already-rendered page, rather than blocking the whole route.
  */
 export function Can({ allowedRoles, children, fallback = null }: CanProps) {
   const role = useAuthStore((state) => state.user?.role);

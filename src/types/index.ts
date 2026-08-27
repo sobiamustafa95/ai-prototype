@@ -3,11 +3,11 @@
  * Types (unlike components) MAY be barrel-exported from this file.
  */
 
-/** Success envelope every `/auth/*` (and other module) response wraps its payload in. */
+/** Standard envelope every API returns. */
 export interface ApiResponse<TData> {
-  data: TData;
-  status: number;
-  message: string;
+  status: 'success' | 'error';
+  data?: TData;
+  error?: string;
 }
 
 /** Generic cursor/offset pagination metadata. */
@@ -18,27 +18,17 @@ export interface Paginated<TItem> {
   total: number;
 }
 
-/** Authenticated principal, matching the backend's `/auth` user shape. */
+/** Minimal authenticated principal used by the auth stub. */
 export interface AuthUser {
-  _id: string;
+  id: string;
   name: string;
   email: string;
-  phone?: string;
-  /** Role for role-gated routes (see src/routes/RoleGuards.tsx). */
-  role: string;
-  status: string;
-  avatar?: string;
+  /** Optional role for role-gated routes (see src/router/guards.tsx § RequireRole). */
+  role?: string;
 }
 
-/**
- * Access + refresh token pair. The access token is a short-lived (15m) JWT sent
- * as `Authorization: Bearer`; the refresh token is a 60-day opaque credential
- * sent only to `/auth/refresh-token` and rotated on every use (see
- * src/services/api-client.ts for the rotation/retry logic).
- */
+/** Auth token pair returned by the login stub. */
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-  expiresIn: string;
-  refreshExpiresIn: string;
 }

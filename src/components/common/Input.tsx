@@ -9,10 +9,8 @@ const inputVariants = cva(
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Visible label text — required so every input is programmatically labeled. */
   label: ReactNode;
-  /** Optional error message; when present the field is marked aria-invalid.
-   *  Typed `| undefined` (not just `?`) because React Hook Form's
-   *  `fieldState.error?.message` is always this exact type, present or not. */
-  error?: string | undefined;
+  /** Optional error message; when present the field is marked aria-invalid. */
+  error?: string;
   /** Optional helper text linked via aria-describedby. */
   hint?: ReactNode;
 }

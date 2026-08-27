@@ -3,23 +3,9 @@
 ## Directory Structure
 
 - `common/` — Reusable, domain-agnostic UI (Button, Input, Modal, Card, ...).
-- `layouts/` — Page shells (`AppLayout`, `AuthLayout`, `ErrorLayout`, `RoleLayout` — one
-  component that renders the right shell for whichever role is signed in, see
-  `src/routes/ProtectedRoutes.tsx`).
-- `<concern>/` (e.g. `auth/`, `example/`) — components for a concern that isn't
-  role-specific. Ships with two: `auth/` (the Auth feature's forms — see its
-  README) and `example/` (`ExampleWidget`, the reference "how to shape a feature"
-  example). Every new non-role concern is a **new folder at this same level**,
-  not nested under a `features/` wrapper.
-- `<role>/` — components used only within one role's own pages (see
-  `src/routes/ProtectedRoutes.tsx` § the role system). No components ship here by default
-  (both example roles are single placeholder pages with no role-specific components
-  yet) — add a folder at this same level when a real project's role needs one,
-  mirroring the matching `src/pages/<role>/` folder.
-
-The matching **pages** (route-level: layout glue, `Seo`, `location.state`/search
-params, navigation) live in `src/pages/`, one folder per concern/role, mirroring
-this structure — see `src/pages/README.md`.
+- `features/` — Feature folders. Ships with exactly one example (`ExampleWidget`).
+  Every new feature is a **copy of that folder, renamed, with the business logic gutted**.
+- `layouts/` — Page shells (`AppLayout`, `AuthLayout`, `ErrorLayout`).
 
 ## Naming Conventions
 

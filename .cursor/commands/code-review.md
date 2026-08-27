@@ -1,4 +1,4 @@
-<!-- AUTO-GENERATED from .claude/commands — edit the source, then run `pnpm ai:sync`. -->
+<!-- AUTO-GENERATED from .claude/commands — edit the source, then run `npm run sync:ai`. -->
 
 Review the relevant code with a code-review mindset. Scope: $ARGUMENTS — default to
 `git diff` (and `git diff --staged`) if nothing is named. Read each change's full
@@ -14,7 +14,7 @@ strict jsx-a11y, Impeccable, React Doctor) already catch what's mechanical; this
 review exists for what they structurally can't — semantic judgment calls like an
 `useEffect` that only mirrors derived state, a mutation that should invalidate a
 query but doesn't, or a component whose reusability was never actually pushed
-into props. Don't re-report what `pnpm gate` would already catch — assume it
+into props. Don't re-report what `npm run gate` would already catch — assume it
 ran and passed; look past it.
 
 ## What to check

@@ -2,8 +2,8 @@ import { ENV } from 'src/constants/env';
 
 /**
  * Runtime configuration derived from the validated env (src/constants/env.ts).
- * Routes in api-routes.ts are absolute (e.g. "/auth/login"), so the base is
- * host-only and empty by default (same-origin, which MSW intercepts in dev + tests).
+ * Routes in api-routes.ts are absolute ("/api/v1/..."), so the base is host-only
+ * and empty by default (same-origin, which MSW intercepts in dev + tests).
  */
 export const CONFIG = {
   API_BASE_URL: ENV.VITE_API_BASE_URL,

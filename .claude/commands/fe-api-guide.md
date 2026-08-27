@@ -1,7 +1,7 @@
 ---
 description: Generate API integration docs from a backend spec/OpenAPI file.
 argument-hint: '<path-or-url to OpenAPI/spec>'
-allowed-tools: Read, Write, Bash(pnpm dlx *)
+allowed-tools: Read, Write, Bash(npx *)
 ---
 
 Generate frontend API integration documentation for the spec at: $ARGUMENTS

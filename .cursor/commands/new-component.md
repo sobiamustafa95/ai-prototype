@@ -1,4 +1,4 @@
-<!-- AUTO-GENERATED from .claude/commands — edit the source, then run `pnpm ai:sync`. -->
+<!-- AUTO-GENERATED from .claude/commands — edit the source, then run `npm run sync:ai`. -->
 
 Scaffold a new component: $ARGUMENTS
 
@@ -11,8 +11,5 @@ Create in `src/components/<target>/`:
 
 - `<ComponentName>.tsx` — typed props interface, single named export, full a11y, tokens only.
 
-No test file for a `common`/`layouts` component on its own — this repo tests at the workflow
-level (see `AGENTS.md` § Testing), not by unit-testing individual primitives.
-
 No barrel export. No hardcoded strings — add a key to `src/i18n/locales/<lng>/common.json`
-and read it with `useTranslation()`'s `t('KEY')`. Then run `pnpm verify`.
+and read it with `useTranslation()`'s `t('KEY')`. Then run `npm run verify`.

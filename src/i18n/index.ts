@@ -21,15 +21,6 @@ export const resources = {
   en: { common: en },
 } as const;
 
-/**
- * Every valid `t()` key. For a data-driven i18n key — e.g. a nav-item config
- * storing which key to resolve later, rather than a component calling `t('KEY')`
- * directly — type the field as `TranslationKey` instead of `string`, so a typo
- * or a key that doesn't exist is still a compile error (`t()` itself only
- * accepts a literal, never a plain `string`, once a key is stored in a variable).
- */
-export type TranslationKey = keyof typeof en;
-
 void i18n.use(initReactI18next).init({
   resources,
   lng: 'en',

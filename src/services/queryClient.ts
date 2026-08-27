@@ -38,14 +38,11 @@ export function createQueryClient(): QueryClient {
       },
     },
     queryCache: new QueryCache({
-      onError: (error, query) => {
-        reportError(error, query.meta?.skipErrorToast);
-      },
+      onError: (error, query) => reportError(error, query.meta?.skipErrorToast),
     }),
     mutationCache: new MutationCache({
-      onError: (error, _variables, _context, mutation) => {
-        reportError(error, mutation.meta?.skipErrorToast);
-      },
+      onError: (error, _variables, _context, mutation) =>
+        reportError(error, mutation.meta?.skipErrorToast),
     }),
   });
 }

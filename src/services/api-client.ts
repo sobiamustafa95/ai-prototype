@@ -1,8 +1,6 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { CONFIG } from 'src/constants/config';
-import { API_ROUTES } from 'src/constants/api-routes';
 import { useAuthStore } from 'src/stores/authStore';
-import { authService } from 'src/services/authService';
 
 /** Normalized error the whole app can rely on (a real Error subclass). */
 export class ApiError extends Error {
@@ -23,114 +21,40 @@ export const apiClient: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-/**
- * Routes where a 401 means "wrong credentials/OTP/token", not "access token
- * expired" — must never trigger a refresh attempt (retrying a bad login as a
- * refreshed request makes no sense, and refresh-token's own 401 must fall
- * straight through to a hard logout instead of trying to refresh itself).
- */
-const AUTH_FLOW_ROUTES: string[] = Object.values(API_ROUTES.AUTH).filter(
-  (route) => route !== API_ROUTES.AUTH.ME && route !== API_ROUTES.AUTH.CHANGE_PASSWORD
-);
-
-function isAuthFlowRoute(url: string | undefined): boolean {
-  if (!url) return false;
-  return AUTH_FLOW_ROUTES.some((route) => url.includes(route));
-}
-
-function extractMessage(data: unknown): string | undefined {
-  if (typeof data !== 'object' || data === null) return undefined;
-  const body = data as { message?: unknown; msg?: unknown };
-  // The backend's one documented inconsistency: validation errors (400) use
-  // `msg`, every other application error uses `message`.
-  if (typeof body.message === 'string') return body.message;
-  if (typeof body.msg === 'string') return body.msg;
-  return undefined;
-}
-
-function toApiError(error: AxiosError): ApiError {
-  // error.message is always a string (Error's own type guarantee) — never
-  // nullish, so there's nothing for a trailing `?? 'Network error'` to catch.
-  return new ApiError(
-    extractMessage(error.response?.data) ?? error.message,
-    error.response?.status ?? 0,
-    error.response?.data
-  );
-}
-
 // ---- Request interceptor: attach bearer token ----
 // Reads from the auth store directly (not React state) — the standard pattern
-// for an axios instance living outside the component tree. The
+// for an axios instance living outside the component tree (matches how our real
+// projects structure this: CarnectionIQ and Solar-lead both call
+// `useAuthStore.getState()` straight from their axios instance file). The
 // api-client -> authStore -> authService -> api-client import cycle is safe here
 // because every read happens inside a callback, never at module-eval time.
 apiClient.interceptors.request.use((request: InternalAxiosRequestConfig) => {
-  const accessToken = useAuthStore.getState().accessToken;
-  if (accessToken) {
-    request.headers.set('Authorization', `Bearer ${accessToken}`);
+  const token = useAuthStore.getState().token;
+  if (token) {
+    request.headers.set('Authorization', `Bearer ${token}`);
   }
   return request;
 });
 
-/**
- * Single-flight refresh: concurrent 401s share one in-flight `/auth/refresh-token`
- * call instead of each firing their own (which would race and, per the backend's
- * reuse-detection, log the user out everywhere — see docs/fe-api-guide.md
- * "The one rule that will bite you"). Cleared once the call settles, success or
- * failure, so a later 401 can retry rather than await a permanently-failed promise.
- */
-let inFlightRefresh: Promise<string> | null = null;
-
-async function refreshAccessToken(): Promise<string> {
-  const { refreshToken } = useAuthStore.getState();
-  if (!refreshToken) throw new Error('No refresh token available');
-
-  const tokens = await authService.refreshToken(refreshToken);
-  // Write BOTH tokens back — the refresh token rotates on every use, and
-  // persisting only the new access token would leave a spent refresh token in
-  // storage that trips the backend's stolen-token detection on the next refresh.
-  useAuthStore.getState().setTokens(tokens);
-  return tokens.accessToken;
-}
-
-// ---- Response interceptor: error normalization + single-flight refresh-and-retry ----
-// The access token is short-lived (15m) by design, so — unlike a hard-logout-on-
-// 401 default — silently refreshing once and retrying is the right default here;
-// see docs/auth-token-refresh.md for the pattern this adapts.
+// ---- Response interceptor: error normalization + hard-logout on 401 ----
+// Deliberately simple: our real projects that hit this in production (Carnection,
+// Glow-Tech, Solar-lead) all just clear the session and redirect on 401 rather than
+// silently refreshing — a silent single-flight refresh is real but rare (only one
+// of four projects implements it well); see docs/auth-token-refresh.md for that
+// pattern documented as an opt-in reference, not the default here.
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
-    const original = error.config as
-      (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
-
-    const shouldAttemptRefresh =
-      error.response?.status === 401 &&
-      original &&
-      !original._retry &&
-      !isAuthFlowRoute(original.url);
-
-    if (!shouldAttemptRefresh) {
-      return Promise.reject(toApiError(error));
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      useAuthStore.setState({ user: null, token: null, status: 'idle' });
     }
 
-    original._retry = true;
-
-    // Only the refresh itself is guarded here — a retry failure below is a
-    // problem with that one request, not a dead session, so it must not be
-    // caught by the same catch that ends the session on a failed refresh.
-    try {
-      inFlightRefresh ??= refreshAccessToken().finally(() => {
-        inFlightRefresh = null;
-      });
-      const accessToken = await inFlightRefresh;
-      original.headers.set('Authorization', `Bearer ${accessToken}`);
-    } catch {
-      // Refresh failed (expired/invalid/revoked session) — end the session the
-      // same way a manual logout does, then let RoleGuards redirect.
-      const { logout } = useAuthStore.getState();
-      await logout();
-      return Promise.reject(toApiError(error));
-    }
-
-    return apiClient(original);
+    const responseError = (error.response?.data as { error?: string } | undefined)?.error;
+    const normalized = new ApiError(
+      responseError ?? error.message ?? 'Network error',
+      error.response?.status ?? 0,
+      error.response?.data
+    );
+    return Promise.reject(normalized);
   }
 );

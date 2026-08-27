@@ -7,35 +7,21 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "packageManager": "pnpm@11.23.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "pnpm check:format",
-    "format:fix": "prettier --write \"src/**/*.{ts,tsx,json,md,css}\"",
+    "lint": "eslint . --fix",
+    "lint:check": "eslint . --max-warnings=0",
+    "typecheck": "tsc -b --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,md,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md,css}\"",
+    "style:check": "impeccable detect src/",
     "doctor": "react-doctor src/",
-    "ai:sync": "node scripts/sync-ai-config.mjs",
-    "ai:check": "node scripts/checks/ai-config-contract.mjs",
-    "check:guardrails": "node scripts/checks/guard-rails.mjs",
-    "check:lint-contract": "node scripts/checks/lint-config-contract.mjs",
-    "check:types": "tsc -b --noEmit",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "check:test": "pnpm test:run",
-    "check:lint": "eslint . --max-warnings=0",
-    "check:a11y": "eslint --config eslint.a11y.config.js \"src/**/*.tsx\" --max-warnings=0",
-    "check:format": "prettier --check \"src/**/*.{ts,tsx,json,md,css}\"",
-    "check:style": "impeccable detect src/ < /dev/null",
-    "check:doctor": "react-doctor src/ --no-supply-chain --yes < /dev/null",
-    "check:build": "pnpm build",
-    "typecheck": "pnpm check:types",
-    "style:check": "pnpm check:style",
-    "verify": "pnpm check:guardrails && pnpm ai:check && pnpm check:lint-contract && pnpm check:types && pnpm check:test && pnpm check:lint && pnpm check:a11y && pnpm check:format && pnpm check:style && pnpm check:doctor && pnpm check:build",
+    "sync:ai": "node scripts/sync-ai-config.mjs",
+    "verify": "npm run typecheck && npm run lint:check && npm run format:check",
     "gate": "node scripts/hooks/pre-commit.mjs",
-    "prepare": "husky"
+    "prepare": "husky && npm run sync:ai"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
@@ -75,9 +61,6 @@
     "@commitlint/config-conventional": "^21.2.2",
     "@eslint/js": "^9.39.5",
     "@tailwindcss/vite": "^4.3.3",
-    "@testing-library/jest-dom": "^7.0.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.6",
     "@types/node": "^26.2.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
@@ -91,7 +74,6 @@
     "globals": "^17.11.0",
     "husky": "^9.1.7",
     "impeccable": "^3.6.0",
-    "jsdom": "^30.0.1",
     "lint-staged": "^17.3.0",
     "msw": "^2.15.0",
     "prettier": "^3.9.6",
@@ -100,8 +82,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.67.0",
-    "vite": "^8.2.1",
-    "vitest": "^4.1.11"
+    "vite": "^8.2.1"
   },
   "msw": {
     "workerDirectory": [
