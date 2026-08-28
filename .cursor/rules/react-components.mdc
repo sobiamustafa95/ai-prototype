@@ -11,5 +11,6 @@ When editing a component in this scope:
 - Props are an explicit `interface`; destructure in the signature; never `props: any`.
 - One **named** export per file — no barrel `index.ts` for components.
 - Buttons need an explicit `type`; images need `alt` (or `alt="" aria-hidden`).
-- User-facing text comes from `src/constants/ui-strings.ts`, never hardcoded in JSX.
+- User-facing text is a key in `src/i18n/locales/<lng>/common.json`, read via
+  `useTranslation()`'s `t('KEY')` — never hardcoded in JSX.
 - Tailwind design tokens only — no arbitrary values like `w-[127px]`.

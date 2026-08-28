@@ -715,7 +715,11 @@ not a discussion; see § Checks vs Fixes above for the command-mutation half of 
 - Commands: author once in `.claude/commands/*.md`; `pnpm ai:sync` mirrors them to
   `.cursor/commands/` (frontmatter stripped) — `pnpm ai:check` (part of `verify`) fails CI if
   a source file changed without a re-sync. Set: `/fix-commit`, `/fe-api-guide`,
-  `/new-component`, `/new-feature`, `/a11y-audit`, `/perf-audit`, `/code-review`.
+  `/new-component`, `/new-feature`, `/a11y-audit`, `/perf-audit`, `/code-review`,
+  `/theme-setup`, `/debug`, `/prototype`.
 - Skills live once in `.claude/skills/` (Cursor loads this folder too). Set: `fe-fix-commit`,
-  `fe-api-guide`, `fe-component-scaffold`, `fe-a11y-audit`, `fe-prototype`, `fe-debug`.
+  `fe-api-guide`, `fe-component-scaffold`, `fe-a11y-audit`, `fe-prototype`, `fe-debug`,
+  `fe-theme-setup`. Every skill has a matching `.claude/commands/*.md` entry point so Cursor
+  (which has no skill auto-discovery of its own) can still reach it explicitly — `code-review`
+  and `perf-audit` are the two commands with no backing skill file, self-contained instead.
 - When blocked by the gate, run `/fix-commit` — it fixes the code, never disables checks.

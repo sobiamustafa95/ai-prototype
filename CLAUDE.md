@@ -7,9 +7,10 @@
 - The rules above come entirely from `AGENTS.md` (imported, not duplicated). Edit rules
   there — never here.
 - Use the `/fix-commit`, `/fe-api-guide`, `/new-component`, `/new-feature`, `/a11y-audit`,
-  `/perf-audit`, and `/code-review` commands in `.claude/commands/`. See each file for usage.
+  `/perf-audit`, `/code-review`, `/theme-setup`, `/debug`, and `/prototype` commands in
+  `.claude/commands/`. See each file for usage.
 - Deeper playbooks are Agent Skills in `.claude/skills/` (`fe-fix-commit`, `fe-api-guide`,
-  `fe-component-scaffold`, `fe-a11y-audit`, `fe-prototype`, `fe-debug`).
+  `fe-component-scaffold`, `fe-a11y-audit`, `fe-prototype`, `fe-debug`, `fe-theme-setup`).
 - `AGENTS.md` is the full rulebook; `docs/GUIDE.md` is the friendlier walkthrough with the
   same rules explained end to end. Read one of the two before writing or editing any component.
 - Git/commit/execution boundaries: see `AGENTS.md` § Agent Execution Safety and § Never Do.

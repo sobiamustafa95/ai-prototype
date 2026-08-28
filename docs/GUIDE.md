@@ -274,8 +274,12 @@ For a single reusable component instead, ask your AI tool for `/new-component`, 
 - **Slash commands** are written once in `.claude/commands/` and mirrored to `.cursor/commands/`
   by `pnpm ai:sync` — `pnpm ai:check` (part of `verify`) fails CI if you forget to run it.
   Available: `/fix-commit`, `/new-component`, `/new-feature`,
-  `/fe-api-guide`, `/a11y-audit`, `/perf-audit`, `/code-review`.
-- **Skills** (deeper playbooks) live in `.claude/skills/`; Cursor reads that folder too.
+  `/fe-api-guide`, `/a11y-audit`, `/perf-audit`, `/code-review`, `/theme-setup`, `/debug`,
+  `/prototype`.
+- **Skills** (deeper playbooks) live in `.claude/skills/`. Cursor has no native skill
+  auto-discovery, so every skill also gets a `.claude/commands/*.md` entry point that names
+  it explicitly — that's how a Cursor user reaches `fe-debug`/`fe-prototype`/`fe-theme-setup`,
+  which have no other trigger in Cursor.
 
 Ask either tool "what are this project's component conventions?" → you get the **same answer**,
 because both read `AGENTS.md`.
