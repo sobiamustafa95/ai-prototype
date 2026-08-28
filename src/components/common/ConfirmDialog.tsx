@@ -35,7 +35,7 @@ export function ConfirmDialog({
     <Dialog {...(open !== undefined ? { open, onOpenChange } : {})}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent dialogTitle={title}>
-        {description && <p className="text-foreground-muted mb-4 text-sm">{description}</p>}
+        {description ? <p className="text-foreground-muted mb-4 text-sm">{description}</p> : null}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={() => onOpenChange?.(false)}>
             {cancelLabel ?? t('BUTTON_CANCEL')}

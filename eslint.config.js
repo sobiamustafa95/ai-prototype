@@ -145,6 +145,10 @@ export default tseslint.config(
       'react/self-closing-comp': 'error',
       'react/button-has-type': 'error',
       'react/no-array-index-key': 'error',
+      // Vercel react-best-practices `rendering-conditional-render`: `cond && <Jsx/>` can
+      // leak a rendered "0"/NaN when `cond` isn't already boolean. Autofixable to a
+      // ternary. See docs/vercel-react-best-practices-classification.md.
+      'react/jsx-no-leaked-render': 'error',
 
       // ---- Hooks ----
       // The maintained preset owns the rule set; dependency correctness is promoted

@@ -44,16 +44,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         className={cn(inputVariants(), className)}
         {...rest}
       />
-      {hint && !error && (
+      {hint && !error ? (
         <p id={hintId} className="text-foreground-muted text-sm">
           {hint}
         </p>
-      )}
-      {error && (
+      ) : null}
+      {error ? (
         <p id={errorId} role="alert" className="text-danger text-sm">
           {error}
         </p>
-      )}
+      ) : null}
     </div>
   );
 });

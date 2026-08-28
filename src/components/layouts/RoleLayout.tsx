@@ -50,7 +50,7 @@ function SidebarShell({ titleKey, navItems }: SidebarShellProps) {
       </aside>
       <div className="flex flex-1 flex-col">
         <header className="border-border flex items-center justify-end gap-4 border-b px-6 py-3">
-          {user && <span className="text-foreground-muted text-sm">{user.email}</span>}
+          {user ? <span className="text-foreground-muted text-sm">{user.email}</span> : null}
           <ThemeToggle />
           <Button
             type="button"

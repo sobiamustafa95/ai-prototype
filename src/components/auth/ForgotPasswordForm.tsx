@@ -43,11 +43,11 @@ export function ForgotPasswordForm() {
         error={errors.email?.message}
         {...register('email')}
       />
-      {forgotPassword.isError && (
+      {forgotPassword.isError ? (
         <p role="alert" className="text-danger text-sm">
           {forgotPassword.error instanceof Error ? forgotPassword.error.message : t('ERROR')}
         </p>
-      )}
+      ) : null}
       <Button type="submit" disabled={forgotPassword.isPending}>
         {t('BUTTON_SEND_CODE')}
       </Button>

@@ -62,11 +62,11 @@ export function OtpForm({ email, onVerify, onResend }: OtpFormProps) {
         error={errors.code?.message}
         {...register('code')}
       />
-      {verify.isError && (
+      {verify.isError ? (
         <p role="alert" className="text-danger text-sm">
           {verify.error instanceof Error ? verify.error.message : t('ERROR')}
         </p>
-      )}
+      ) : null}
       <Button type="submit" disabled={verify.isPending}>
         {t('BUTTON_VERIFY')}
       </Button>

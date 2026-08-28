@@ -56,11 +56,11 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         error={errors.confirmPassword?.message}
         {...register('confirmPassword')}
       />
-      {resetPassword.isError && (
+      {resetPassword.isError ? (
         <p role="alert" className="text-danger text-sm">
           {resetPassword.error instanceof Error ? resetPassword.error.message : t('ERROR')}
         </p>
-      )}
+      ) : null}
       <Button type="submit" disabled={resetPassword.isPending}>
         {t('BUTTON_RESET_PASSWORD')}
       </Button>

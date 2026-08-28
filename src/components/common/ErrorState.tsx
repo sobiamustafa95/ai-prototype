@@ -15,11 +15,11 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
       className="border-danger flex flex-col items-center gap-3 rounded-md border border-dashed py-8 text-center"
     >
       <p className="text-foreground text-sm">{message ?? t('ERROR')}</p>
-      {onRetry && (
+      {onRetry ? (
         <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
           {t('BUTTON_RETRY')}
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }

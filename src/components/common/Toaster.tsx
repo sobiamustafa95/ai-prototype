@@ -39,11 +39,11 @@ export function Toaster() {
           }}
         >
           <div className="flex flex-col gap-1">
-            {item.title && (
+            {item.title ? (
               <ToastPrimitive.Title className="text-sm font-semibold">
                 {item.title}
               </ToastPrimitive.Title>
-            )}
+            ) : null}
             <ToastPrimitive.Description className="text-foreground-muted text-sm">
               {item.description}
             </ToastPrimitive.Description>

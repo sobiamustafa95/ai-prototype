@@ -62,26 +62,26 @@ export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: Example
         <Button type="submit">{t('BUTTON_SEARCH')}</Button>
       </form>
 
-      {isLoading && (
+      {isLoading ? (
         <p role="status" className="text-foreground-muted">
           {t('LOADING')}
         </p>
-      )}
+      ) : null}
 
-      {isError && (
+      {isError ? (
         <div role="alert" className="flex items-center gap-3">
           <span className="text-danger">{t('ERROR')}</span>
           <Button variant="secondary" size="sm" onClick={() => void refetch()}>
             {t('BUTTON_RETRY')}
           </Button>
         </div>
-      )}
+      ) : null}
 
-      {data && data.items.length === 0 && (
+      {data && data.items.length === 0 ? (
         <p className="text-foreground-muted">{t('EMPTY_RESULTS')}</p>
-      )}
+      ) : null}
 
-      {data && data.items.length > 0 && (
+      {data && data.items.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {data.items.map((item) => (
             <li
@@ -93,9 +93,9 @@ export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: Example
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
 
-      {data && data.total > pageSize && (
+      {data && data.total > pageSize ? (
         <nav aria-label={t('LABEL_PAGINATION')} className="flex items-center justify-between">
           <Button
             variant="secondary"
@@ -121,7 +121,7 @@ export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: Example
             {t('BUTTON_NEXT')}
           </Button>
         </nav>
-      )}
+      ) : null}
     </section>
   );
 }

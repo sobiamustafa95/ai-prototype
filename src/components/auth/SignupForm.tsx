@@ -71,11 +71,11 @@ export function SignupForm() {
         error={errors.confirmPassword?.message}
         {...register('confirmPassword')}
       />
-      {signup.isError && (
+      {signup.isError ? (
         <p role="alert" className="text-danger text-sm">
           {signup.error instanceof Error ? signup.error.message : t('ERROR')}
         </p>
-      )}
+      ) : null}
       <Button type="submit" disabled={signup.isPending}>
         {t('BUTTON_SIGNUP')}
       </Button>

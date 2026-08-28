@@ -604,6 +604,11 @@ Locally:
 enforcement. This budget only measures what's **measurable and objective** — shipped
 bundle size and code-splitting — the same bar the rest of this gate holds every other check to.
 
+External React/Next.js performance guidance evaluated — see
+`docs/vercel-react-best-practices-classification.md`. Enforced items are already reflected in
+`eslint.config.js`/`doctor.config.ts`/`.size-limit.js` above; that file exists for
+reasoning-traceability, not as a second rulebook.
+
 ---
 
 ## Package Manager & Supply Chain

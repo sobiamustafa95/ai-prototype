@@ -56,11 +56,11 @@ export function LoginForm() {
         error={errors.password?.message}
         {...register('password')}
       />
-      {error && (
+      {error ? (
         <p role="alert" className="text-danger text-sm">
           {error}
         </p>
-      )}
+      ) : null}
       <Button type="submit" disabled={status === 'authenticating'}>
         {t('BUTTON_LOGIN')}
       </Button>
