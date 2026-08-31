@@ -2,7 +2,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Seo } from 'src/components/common/Seo';
 import { OtpForm } from 'src/components/auth/OtpForm';
-import { authService } from 'src/services/authService';
+import { useForgotPassword, useVerifyForgotPasswordOtp } from 'src/hooks/auth/useAuth';
 
 interface LocationState {
   email?: string;
@@ -14,6 +14,9 @@ export function VerifyForgotPasswordOtpPage() {
   const navigate = useNavigate();
   const email = (location.state as LocationState | null)?.email;
   const { t } = useTranslation();
+  const verifyOtp = useVerifyForgotPasswordOtp();
+  // Resending is the same call as the initial "forgot password" submit.
+  const resend = useForgotPassword();
 
   // No email in state means this route was hit directly, not via forgot-password
   // — send the user back to start the flow properly instead of a broken form.
@@ -29,10 +32,10 @@ export function VerifyForgotPasswordOtpPage() {
       <OtpForm
         email={email}
         onVerify={async (otp) => {
-          const { resetToken } = await authService.verifyForgotPasswordOtp({ email, otp });
+          const { resetToken } = await verifyOtp.mutateAsync({ email, otp });
           void navigate('/reset-password', { state: { resetToken } });
         }}
-        onResend={() => authService.forgotPassword({ email })}
+        onResend={() => resend.mutateAsync({ email })}
       />
     </>
   );

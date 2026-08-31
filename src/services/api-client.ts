@@ -1,8 +1,8 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { CONFIG } from 'src/constants/config';
-import { API_ROUTES } from 'src/constants/api-routes';
+import { AuthRoutes } from 'src/constants/api-routes';
 import { useAuthStore } from 'src/stores/authStore';
-import { authService } from 'src/services/authService';
+import { authService } from 'src/services/auth/authService';
 
 /** Normalized error the whole app can rely on (a real Error subclass). */
 export class ApiError extends Error {
@@ -17,6 +17,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * This instance's fixed `Content-Type: application/json` default breaks a `FormData`
+ * body (e.g. a file upload) if sent as-is: confirmed empirically (axios 1.19.0's own
+ * `transformRequest`, `node_modules/axios/lib/defaults/index.js`) — with a JSON
+ * content-type already set, axios coerces the `FormData` into a JSON-stringified
+ * object instead of sending real multipart data, and any `File`/`Blob` entry becomes
+ * an empty `{}` (its binary content is silently dropped, not an error). Pass
+ * `{ headers: { 'Content-Type': undefined } }` in that one call's config to fix it —
+ * this lets the request layer set the correct `multipart/form-data; boundary=...`
+ * header itself (also confirmed empirically); a fixed `multipart/form-data` string
+ * would still be wrong, since it would be missing the required boundary parameter.
+ */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: CONFIG.API_BASE_URL,
   timeout: 15_000,
@@ -29,8 +41,8 @@ export const apiClient: AxiosInstance = axios.create({
  * refreshed request makes no sense, and refresh-token's own 401 must fall
  * straight through to a hard logout instead of trying to refresh itself).
  */
-const AUTH_FLOW_ROUTES: string[] = Object.values(API_ROUTES.AUTH).filter(
-  (route) => route !== API_ROUTES.AUTH.ME && route !== API_ROUTES.AUTH.CHANGE_PASSWORD
+const AUTH_FLOW_ROUTES: string[] = Object.values(AuthRoutes).filter(
+  (route) => route !== AuthRoutes.ME && route !== AuthRoutes.CHANGE_PASSWORD
 );
 
 function isAuthFlowRoute(url: string | undefined): boolean {
@@ -74,8 +86,8 @@ apiClient.interceptors.request.use((request: InternalAxiosRequestConfig) => {
 /**
  * Single-flight refresh: concurrent 401s share one in-flight `/auth/refresh-token`
  * call instead of each firing their own (which would race and, per the backend's
- * reuse-detection, log the user out everywhere — see docs/fe-api-guide.md
- * "The one rule that will bite you"). Cleared once the call settles, success or
+ * reuse-detection, log the user out everywhere — see docs/auth-token-refresh.md
+ * for the full rationale). Cleared once the call settles, success or
  * failure, so a later 401 can retry rather than await a permanently-failed promise.
  */
 let inFlightRefresh: Promise<string> | null = null;

@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { renderWithProviders } from 'src/test/renderWithProviders';
 import { server } from 'src/mocks/server';
-import { API_ROUTES } from 'src/constants/api-routes';
+import { AuthRoutes } from 'src/constants/api-routes';
 import { SignupForm } from './SignupForm';
 
 /** Stand-in for the real VerifySignupOtpPage — proves navigation + router state,
@@ -56,7 +56,7 @@ describe('SignupForm workflow', () => {
     const user = userEvent.setup();
     let signupCalls = 0;
     server.use(
-      http.post(API_ROUTES.AUTH.SIGNUP, () => {
+      http.post(AuthRoutes.SIGNUP, () => {
         signupCalls += 1;
         return HttpResponse.json({ data: true, status: 200, message: 'Account created.' });
       })

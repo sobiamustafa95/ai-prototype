@@ -32,8 +32,9 @@ failure), use `fe-fix-commit` instead — this skill is for bugs the quality gat
    in dev, a targeted test, React DevTools) before writing the fix — don't fix-and-pray.
 4. **Fix the root cause**, not the symptom — this repo's rule against `eslint-disable`/`as
 any`/`@ts-ignore` applies here too; a suppressed type error is often the actual bug.
-5. **Add a regression test** (see `fe-tdd`) that would have caught this, using
-   `renderWithProviders` and the real failure mode, not a trivial happy path.
+5. **Add a regression test** that would have caught this — the `*.workflow.test.tsx`
+   convention (`AGENTS.md` § Testing), using `renderWithProviders` and the real failure
+   mode, not a trivial happy path.
 
 ## Red flags that mean "stop and ask"
 

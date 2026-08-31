@@ -14,8 +14,9 @@ hard-logout-on-401, which is the simpler default those other projects use.
   would be forced to re-authenticate multiple times per hour.
 - `glassatecture-fe` (a Next.js project) already runs this pattern in production, so it's a
   proven reference, not a novel design.
-- The refresh token **rotates** on every use (see `docs/fe-api-guide.md`), which is exactly
-  the scenario single-flight coordination exists to guard against — without it, concurrent
+- The refresh token **rotates** on every use (see "How this boilerplate actually implements
+  it" below), which is exactly the scenario single-flight coordination exists to guard
+  against — without it, concurrent
   401s would each fire their own refresh, race, and the loser would replay an already-spent
   refresh token, logging the user out everywhere.
 
@@ -91,7 +92,7 @@ queue-array shape above (same single-flight guarantee, fewer moving parts):
 - Both tokens from a refresh are written back via `useAuthStore.getState().setTokens(...)` —
   writing only the new access token would leave a spent refresh token in storage, which trips
   the backend's stolen-token/reuse detection on the very next refresh.
-- `AUTH_FLOW_ROUTES` (derived from `API_ROUTES.AUTH`, excluding `ME`/`CHANGE_PASSWORD`) is the
+- `AUTH_FLOW_ROUTES` (derived from `AuthRoutes`, excluding `ME`/`CHANGE_PASSWORD`) is the
   exclusion list — a 401 on any of those means bad credentials/OTP/token, not an expired
   access token.
 - On refresh failure, `useAuthStore.getState().logout()` runs — same cleanup a manual logout

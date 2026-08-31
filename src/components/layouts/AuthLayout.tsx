@@ -11,8 +11,14 @@ export function AuthLayout() {
         <div className="absolute top-3 right-3">
           <ThemeToggle />
         </div>
-        <h1 className="text-foreground mb-6 text-center text-xl font-semibold">{t('APP_NAME')}</h1>
-        <Outlet />
+        <header>
+          <h1 className="text-foreground mb-6 text-center text-xl font-semibold">
+            {t('APP_NAME')}
+          </h1>
+        </header>
+        <main aria-label={t('LABEL_MAIN')}>
+          <Outlet />
+        </main>
       </div>
     </div>
   );

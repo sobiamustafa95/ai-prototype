@@ -3,12 +3,11 @@
   "ERROR": "An error occurred. Please try again.",
   "SUCCESS": "Operation completed successfully.",
   "EMPTY_RESULTS": "No results found",
-  "EMPTY_LIST": "No items yet. Create one to get started!",
 
   "BUTTON_SAVE": "Save",
   "BUTTON_CANCEL": "Cancel",
   "BUTTON_DELETE": "Delete",
-  "BUTTON_SUBMIT": "Submit",
+  "BUTTON_EDIT": "Edit",
   "BUTTON_SEARCH": "Search",
   "BUTTON_PREVIOUS": "Previous",
   "BUTTON_NEXT": "Next",
@@ -27,12 +26,12 @@
 
   "LABEL_SEARCH": "Search",
   "LABEL_PAGINATION": "Pagination",
+  "LABEL_TITLE": "Title",
+  "LABEL_DESCRIPTION": "Description",
   "LABEL_MAIN": "Main content",
   "LABEL_PRIMARY_NAV": "Primary navigation",
   "LABEL_SIDEBAR_NAV": "Dashboard navigation",
-  "LABEL_NOTIFICATIONS": "Notifications",
   "LABEL_THEME_TOGGLE": "Toggle color theme",
-  "LABEL_USER_MENU": "User menu",
   "LABEL_PASSWORD_SHOW": "Show password",
   "LABEL_PASSWORD_HIDE": "Hide password",
 
@@ -48,8 +47,9 @@
   "PORTAL_ADMIN_TITLE": "Admin Portal",
   "NAV_LOGIN": "Sign in",
   "NAV_SIGN_OUT": "Sign out",
-  "HOME_CTA_LOGIN": "Sign in to your account",
-  "HOME_CTA_DASHBOARD": "Go to dashboard",
+  "NO_HOME_ROUTE_TITLE": "No home page configured for this role yet",
+  "NO_HOME_ROUTE_BODY": "You're signed in, but this role has no route registered in ProtectedRoutes.tsx yet — add one to fix this.",
+  "NO_HOME_ROUTE_SIGNED_IN_AS": "Signed in as:",
   "NOT_FOUND_TITLE": "Page not found",
   "NOT_FOUND_BODY": "The page you are looking for does not exist.",
   "FORBIDDEN_TITLE": "You don't have access",
@@ -99,5 +99,13 @@
   "LINK_FORGOT_PASSWORD": "Forgot password?",
   "LINK_BACK_TO_LOGIN": "Back to sign in",
   "LINK_NO_ACCOUNT": "Don't have an account? Sign up",
-  "LINK_HAVE_ACCOUNT": "Already have an account? Sign in"
+  "LINK_HAVE_ACCOUNT": "Already have an account? Sign in",
+
+  "EXAMPLE_ADD_TITLE": "Add example item",
+  "EXAMPLE_EDIT_TITLE": "Edit example item",
+  "EXAMPLE_DELETE_CONFIRM_TITLE": "Delete this item?",
+  "EXAMPLE_DELETE_CONFIRM_BODY": "This can't be undone.",
+  "EXAMPLE_ITEM_CREATED": "Item created.",
+  "EXAMPLE_ITEM_UPDATED": "Item updated.",
+  "EXAMPLE_ITEM_DELETED": "Item deleted."
 }

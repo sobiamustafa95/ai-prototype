@@ -1,12 +1,21 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
 import { Button } from 'src/components/common/Button';
 import { Input } from 'src/components/common/Input';
+import { Pagination } from 'src/components/common/Pagination';
 import { getPageCount } from 'src/utils/getPageCount';
-import { exampleSearchSchema, type ExampleSearchValues } from 'src/schemas/example.schema';
-import { useExampleItems } from './useExampleItems';
+import {
+  exampleSearchSchema,
+  type ExampleItem,
+  type ExampleSearchValues,
+} from 'src/schemas/example.schema';
+import { useExampleItems } from 'src/hooks/common/useExampleItems';
 import { EXAMPLE_PAGE_SIZE, useExampleWidgetStore } from './exampleWidgetStore';
+import { AddExampleItemModal } from './AddExampleItemModal';
+import { EditExampleItemModal } from './EditExampleItemModal';
+import { DeleteExampleItemButton } from './DeleteExampleItemButton';
 
 interface ExampleWidgetProps {
   /** Section heading. Defaults to a generic label — override per usage. */
@@ -16,9 +25,11 @@ interface ExampleWidgetProps {
 }
 
 /**
- * Reference feature: a paginated, searchable list.
- * Demonstrates typed props, RHF+Zod forms, Zustand UI state, TanStack Query data,
- * full keyboard/screen-reader accessibility, and token-only Tailwind styling.
+ * Reference feature: a paginated, searchable, full-CRUD list — the reference shape
+ * for AGENTS.md § Data & State's mutation-invalidation pattern (see
+ * src/hooks/common/useCreateExampleItem.ts/useUpdateExampleItem.ts/useDeleteExampleItem.ts).
+ * Demonstrates typed props, RHF+Zod forms, Zustand UI state, TanStack Query data +
+ * mutations, full keyboard/screen-reader accessibility, and token-only Tailwind styling.
  */
 export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: ExampleWidgetProps) {
   const { t } = useTranslation();
@@ -26,6 +37,9 @@ export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: Example
   const page = useExampleWidgetStore((state) => state.page);
   const setQuery = useExampleWidgetStore((state) => state.setQuery);
   const setPage = useExampleWidgetStore((state) => state.setPage);
+  // Which row's edit modal is open — transient, component-local UI state, not
+  // worth promoting into exampleWidgetStore.ts (see AGENTS.md § Data & State).
+  const [editingItem, setEditingItem] = useState<ExampleItem | null>(null);
 
   const { register, handleSubmit } = useForm<ExampleSearchValues>({
     resolver: zodResolver(exampleSearchSchema),
@@ -41,9 +55,12 @@ export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: Example
 
   return (
     <section aria-labelledby="example-widget-heading" className="flex flex-col gap-6">
-      <h2 id="example-widget-heading" className="text-xl font-semibold">
-        {heading ?? t('NAV_EXAMPLE')}
-      </h2>
+      <div className="flex items-center justify-between gap-4">
+        <h2 id="example-widget-heading" className="text-xl font-semibold">
+          {heading ?? t('NAV_EXAMPLE')}
+        </h2>
+        <AddExampleItemModal />
+      </div>
 
       <form
         role="search"
@@ -86,41 +103,39 @@ export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: Example
           {data.items.map((item) => (
             <li
               key={item.id}
-              className="border-border bg-surface flex flex-col gap-1 rounded-md border p-4"
+              className="border-border bg-surface flex items-start justify-between gap-4 rounded-md border p-4"
             >
-              <span className="text-foreground font-medium">{item.title}</span>
-              <span className="text-foreground-muted text-sm">{item.description}</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-foreground font-medium">{item.title}</span>
+                <span className="text-foreground-muted text-sm">{item.description}</span>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditingItem(item);
+                  }}
+                >
+                  {t('BUTTON_EDIT')}
+                </Button>
+                <DeleteExampleItemButton item={item} />
+              </div>
             </li>
           ))}
         </ul>
       ) : null}
 
+      <EditExampleItemModal
+        item={editingItem}
+        onOpenChange={(open) => {
+          if (!open) setEditingItem(null);
+        }}
+      />
+
       {data && data.total > pageSize ? (
-        <nav aria-label={t('LABEL_PAGINATION')} className="flex items-center justify-between">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => {
-              setPage(page - 1);
-            }}
-          >
-            {t('BUTTON_PREVIOUS')}
-          </Button>
-          <span aria-live="polite" className="text-foreground-muted text-sm">
-            {page} / {pageCount}
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={page >= pageCount}
-            onClick={() => {
-              setPage(page + 1);
-            }}
-          >
-            {t('BUTTON_NEXT')}
-          </Button>
-        </nav>
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
       ) : null}
     </section>
   );

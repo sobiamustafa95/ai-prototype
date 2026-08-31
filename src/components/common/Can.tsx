@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { useAuthStore } from 'src/stores/authStore';
+import { Role } from 'src/routes/roles';
 
 interface CanProps {
   /** Roles that may see `children`. */
-  allowedRoles: readonly string[];
+  allowedRoles: readonly Role[];
   children: ReactNode;
   /** Rendered instead when the current user's role isn't in `allowedRoles`. */
   fallback?: ReactNode;
@@ -16,6 +17,10 @@ interface CanProps {
  */
 export function Can({ allowedRoles, children, fallback = null }: CanProps) {
   const role = useAuthStore((state) => state.user?.role);
-  if (!role || !allowedRoles.includes(role)) return <>{fallback}</>;
+  // `role` is an unvalidated string from the backend/auth store (see AuthUser.role
+  // in src/types/auth/index.ts) — the cast mirrors roles.ts's own `isRole` type
+  // guard, comparing it against the closed `Role` set without widening
+  // `allowedRoles`' own element type to `string` (AGENTS.md § Constant Registries).
+  if (!role || !allowedRoles.includes(role as Role)) return <>{fallback}</>;
   return <>{children}</>;
 }

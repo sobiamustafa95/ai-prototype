@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from 'src/components/common/EmptyState';
 
 /**
- * `ROLES.ADMIN`'s own dashboard — same shape as the member role's
+ * `Role.ADMIN`'s own dashboard — same shape as the member role's
  * `DashboardPage`, proving the admin role renders end-to-end without inventing
  * a real admin feature. Registered in `src/routes/ProtectedRoutes.tsx`'s
  * `ADMIN_PROTECTED_ROUTES`, wired under `RoleLayout` + `RoleGuards` in

@@ -9,12 +9,16 @@ import { test, expect } from './fixtures';
  * workflow tests (src/components/**\/*.workflow.test.tsx).
  */
 test.describe('App smoke', () => {
-  test('boots and renders the home page', async ({ page, checkA11y }) => {
+  test('boots and redirects a signed-out visitor from "/" to the login page', async ({
+    page,
+    checkA11y,
+  }) => {
+    // "/" is never real content (src/routes/HomeRedirectRoute.tsx) — a
+    // signed-out visitor always lands on /login. Proves the app boots in a
+    // real browser AND that the auth-aware root redirect actually fires.
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Geeks FE Boilerplate' })).toBeVisible();
-    // Both the primary nav and the page's own CTA link to /example with the
-    // same accessible name — scope to the main content region to pick one.
-    await expect(page.getByRole('main').getByRole('link', { name: 'Example' })).toBeVisible();
+    await expect(page).toHaveURL('/login');
+    await expect(page.getByRole('heading', { name: 'Sign in', level: 2 })).toBeVisible();
 
     await checkA11y();
   });
@@ -23,8 +27,10 @@ test.describe('App smoke', () => {
     page,
     checkA11y,
   }) => {
-    await page.goto('/');
-    await page.getByRole('main').getByRole('link', { name: 'Example' }).click();
+    // /example needs no auth guard (AGENTS.md's public-shell routing
+    // category), so it's reached directly rather than via "/", which now
+    // always redirects a signed-out visitor to /login.
+    await page.goto('/example');
 
     await expect(page.getByRole('heading', { name: 'Example', level: 1 })).toBeVisible();
     // Proves the real fetch → MSW → real HTTP response round trip, not a stub.

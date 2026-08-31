@@ -1,7 +1,7 @@
 # Admin Role
 
-The `ROLES.ADMIN`-only pages — registered in `src/routes/ProtectedRoutes.tsx`'s
-`ADMIN_PROTECTED_ROUTES` (`roles: [ROLES.ADMIN]`, plus `nav` for its sidebar entry — one
+The `Role.ADMIN`-only pages — registered in `src/routes/ProtectedRoutes.tsx`'s
+`ADMIN_PROTECTED_ROUTES` (`roles: [Role.ADMIN]`, plus `nav` for its sidebar entry — one
 array is both the route table and the nav config, no separate file to keep in sync).
 Currently one placeholder page, `AdminDashboardPage.tsx`. Replace its content with a real
 first admin feature; add more pages to that same array as the role grows.

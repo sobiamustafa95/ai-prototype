@@ -45,6 +45,21 @@ Two rules override everything else:
 - **Package manager:** pnpm only — `pnpm-lock.yaml` is canonical, `packageManager` in
   `package.json` pins the version. See § Package Manager & Supply Chain for the install-time
   hardening this implies.
+- **Charting/data-visualization:** recharts. Every color a chart uses is a `@theme` CSS custom
+  property, passed directly as the string value of the relevant SVG prop —
+  `fill="var(--color-brand-500)"`, `stroke="var(--color-border)"` — never a hardcoded hex/JS
+  color, same rule as every other visual value in this repo. Verified directly (not assumed):
+  a real chart rendered through the actual `vite build`/`vite preview` pipeline resolves these
+  correctly in both light and dark mode. Two things worth knowing: recharts doesn't forward
+  arbitrary props (e.g. `data-testid`) down to the SVG elements it draws — target its own
+  emitted classes (e.g. `.recharts-bar-rectangle`) instead, in anything that needs to select a
+  chart element; and reading a chart element's exact `getComputedStyle(...).fill` immediately
+  after page load is measurably flaky in headless Chromium (confirmed: intermittent
+  empty-string reads across repeated runs) — a testing-instrumentation timing gap, not a
+  rendering bug (the CSS custom property itself always resolved correctly, and the actual
+  paint output is correct — confirmed by direct screenshot comparison), so don't write an
+  automated test asserting on a chart's exact computed color; assert on structure/content
+  instead. See `.claude/skills/fe-page-scaffold/SKILL.md` for the full guidance this feeds.
 
 Do not substitute a stack choice without flagging it first.
 
@@ -60,44 +75,92 @@ src/
                           DataTable, Seo, Can (inline role gate)
   components/auth/       Auth forms only: LoginForm, SignupForm, OtpForm, ForgotPasswordForm,
                           ResetPasswordForm — pages that route to them live in src/pages/auth/
-  components/example/    ExampleWidget (the one example feature: generic paginated list)
+  components/example/    ExampleWidget (the one example feature: generic paginated list) —
+                          its data-fetching/mutation hooks live in hooks/common/, not here
   components/<role>/     Components scoped to one role's own pages (see
                           routes/ProtectedRoutes.tsx) — none ship by default (both example
                           roles are placeholder pages with no role-specific components
-                          yet); add at this level, mirrored by src/pages/<role>/
+                          yet); add at this level, mirrored by src/pages/<role>/. Lint-
+                          enforced: `roleBoundaries/no-cross-role-component-import`
+                          (eslint.config.js) blocks any import of a role's folder from
+                          outside that same role's own components/pages — no new role
+                          to list there when a role is added, it derives "which folders
+                          are roles" from AGENTS.md rule #1's own concern-folder
+                          exception list (common/auth/example/layouts), not a hardcoded
+                          role name.
   components/layouts/    AppLayout, AuthLayout, ErrorLayout, RoleLayout (renders the right
                           shell for whichever role is signed in — driven by
                           routes/ProtectedRoutes.tsx, not a separate layout per role)
-  pages/common/          Pages reachable by every role: HomePage, ForbiddenPage, ExamplePage,
-                          and the common-route placeholders every role's sidebar links to —
+  pages/common/          Pages reachable by every role: ForbiddenPage, ExamplePage, and the
+                          common-route placeholders every role's sidebar links to —
                           SettingsPage/ProfilePage/NotificationsPage (roles: 'all', registered
                           in routes/ProtectedRoutes.tsx's COMMON_PROTECTED_ROUTES)
   pages/auth/            The 5 Auth pages (route-level glue only — see components/auth/README)
   pages/<role>/          Pages owned by one role — mirrors components/<role>/. Ships with
-                          two placeholders: member/ (ROLES.MEMBER) and admin/ (ROLES.ADMIN)
-  hooks/                 Generic hooks (useDebouncedValue, useThemeSync,
-                          useSyncAuthAcrossTabs); feature hooks live in their own folder
+                          two placeholders: member/ (Role.MEMBER) and admin/ (Role.ADMIN)
+  hooks/<concern>/       Every hook, no exceptions — src/hooks/<concern>/<hookName>.ts,
+                          where <concern> is common/ (generic or cross-role, e.g.
+                          useDebouncedValue, useThemeSync, useSyncAuthAcrossTabs, and
+                          every current feature-data hook — see § "Where things go"
+                          below), auth/ (useAuth.ts — every auth mutation hook in one
+                          file: useLogin/useSignup/useLogout/useForgotPassword/
+                          useResetPassword/useVerifyOtp, plus useResendSignupOtp/
+                          useVerifyForgotPasswordOtp for the forgot-password OTP flow —
+                          see that file's own doc comment for why useLogin/useLogout
+                          don't call authService directly like the rest do), or a role
+                          name (admin/member/a future portal) for a hook genuinely
+                          specific to that role's own pages. A feature's own
+                          data-fetching hook is never co-located inside its component
+                          folder — company-wide convention, not per-project.
+                          hooks/admin/ and hooks/member/ don't exist yet (no hook is
+                          role-specific today) — expected, not a gap, same as
+                          components/admin/ and components/member/ themselves; see
+                          hooks/README.md.
   lib/                   utils.ts (cn() class-merge helper for CVA/Radix components)
-  services/              api-client.ts (bearer attach + refresh-and-retry), authService.ts
-                          (real /auth contract), queryClient.ts
+  services/<concern>/    api-client.ts and queryClient.ts stay at services/ root —
+                          cross-cutting infrastructure every concern's service depends
+                          on, not a "concern" of their own (same reasoning that keeps
+                          lib/utils.ts and constants/ un-concern-scoped), never
+                          services/common/. auth/authService.ts (real /auth contract)
+                          is the one concern folder that exists today; a future
+                          concern (e.g. a real cross-role service, not infra) gets its
+                          own services/<concern>/ the moment one is actually needed —
+                          same "stays empty until needed" precedent as hooks/admin/;
+                          see services/README.md.
   utils/                 Pure functions only (100% unit-testable)
   schemas/               Zod schemas (forms + API contracts); common.schema.ts for
                           shared primitives (email/password/phone/url)
-  types/                 Shared TS interfaces (types MAY be barrel-exported)
-  constants/             api-routes.ts, config.ts, env.ts (validated env)
+  types/<concern>/       Shared TS interfaces (types MAY be barrel-exported) — common/
+                          for anything genuinely cross-concern (ApiResponse, Paginated),
+                          auth/ for auth-scoped types (AuthUser, AuthTokens). A type
+                          used by only one concern lives in that concern's own folder,
+                          never force-moved into common/ just because it exists; see
+                          types/README.md.
+  constants/             api-routes.ts (one enum per route group, e.g. AuthRoutes/
+                          ExampleRoutes), queryKeys.ts (the global QueryKey enum), config.ts,
+                          env.ts (validated env)
   routes/                roles.ts (the Role registry), ProtectedRoutes.tsx (every protected
                           page + which roles may reach it + its sidebar nav entry, plus
-                          getNavItemsForRole/getHomeRouteForRole/getRoleLayout),
-                          PublicRoutes.tsx (the guest-only auth screens), AppRouters.tsx
-                          (createBrowserRouter — generates every <Route> from those two
-                          files), AuthRedirectRoute.tsx (keeps a signed-in user off the
-                          public auth screens), AuthenticatedRoute.tsx (auth-only gate —
-                          wraps RoleLayout itself around the whole protected group so an
-                          unauthenticated visitor never sees a flash of its chrome, and
-                          doubles as a standalone gate for a route outside the registry),
-                          RoleGuards.tsx (the per-route auth + role gate `AppRouters.tsx`
-                          wraps every protected route in) — page components live in
-                          src/pages/, not here
+                          getNavItemsForRole/getHomeRouteForRole/hasHomeRouteForRole/
+                          getRoleLayout), PublicRoutes.tsx (the guest-only auth screens),
+                          AppRouters.tsx (createBrowserRouter — generates every <Route> from
+                          those two files, PLUS its own hardcoded "public shell" routes
+                          reachable whether signed in or not — ForbiddenPage, ExamplePage,
+                          the catch-all 404 — see § "Where things go" below),
+                          HomeRedirectRoute.tsx ("/" itself — never real content; a
+                          signed-in visitor goes straight to getHomeRouteForRole(user.role),
+                          a signed-out one to /login; if hasHomeRouteForRole(user.role) is
+                          false — a role genuinely has no nav-eligible route registered yet —
+                          renders a clear dev-facing message instead of silently falling
+                          back to /login), AuthRedirectRoute.tsx (keeps a signed-in user off
+                          the public auth screens, same getHomeRouteForRole target),
+                          AuthenticatedRoute.tsx (auth-only gate — wraps RoleLayout itself
+                          around the whole protected group so an unauthenticated visitor
+                          never sees a flash of its chrome, and doubles as a standalone gate
+                          both HomeRedirectRoute and a route outside the registry reuse for
+                          their own signed-out branch), RoleGuards.tsx (the per-route auth +
+                          role gate `AppRouters.tsx` wraps every protected route in) — page
+                          components live in src/pages/, not here
   stores/                Zustand stores, one file per domain slice (authStore is
                           persist-backed, holds accessToken/refreshToken/user/hasHydrated;
                           themeStore drives light/dark/system)
@@ -118,13 +181,15 @@ Where things go — quick answers for "where does X go?":
   trapping, portals, roving tabindex) that's error-prone to hand-roll.
 - A screen/feature → **copy** `components/example/` + `pages/common/ExamplePage.tsx` (a
   data-driven list/search screen) or `components/auth/` + `pages/auth/` (a multi-page form
-  flow), whichever shape is closer, rename, gut the logic. A component that isn't
-  role-specific gets its own folder at `components/<concern>/` (same level as `common/`);
-  a role-specific one gets `components/<role>/`, mirrored by `pages/<role>/`.
+  flow), whichever shape is closer, rename, gut the logic — **and also copy its hooks**,
+  which live in `hooks/common/` (`useExampleItems.ts` + its three mutation-hook siblings),
+  not the component folder itself, so they don't come along automatically. A component that
+  isn't role-specific gets its own folder at `components/<concern>/` (same level as
+  `common/`); a role-specific one gets `components/<role>/`, mirrored by `pages/<role>/`.
 - A new role, or a route only some roles may reach → this is the **role system**
   (`src/routes/ProtectedRoutes.tsx`), not a one-off guard. Three steps, in order: add the
-  role to `src/routes/roles.ts`'s `ROLES`; add its own routes to `ProtectedRoutes.tsx`
-  (`roles: [ROLES.X]`, plus `nav: { labelKey, end? }` on any route that should appear in
+  role to `src/routes/roles.ts`'s `Role` enum; add its own routes to `ProtectedRoutes.tsx`
+  (`roles: [Role.X]`, plus `nav: { labelKey, end? }` on any route that should appear in
   the sidebar) and its entry in that same file's `ROLE_LAYOUT` map (reuse
   `variant: 'sidebar'` unless it needs a visually different shell); add its pages under
   `src/pages/<role>/`. A route every role should reach (e.g. the shipped settings/profile/
@@ -134,20 +199,40 @@ Where things go — quick answers for "where does X go?":
   generates every protected `<Route>` from `PROTECTED_ROUTES`, wrapping each one in
   `RoleGuards` (`src/routes/RoleGuards.tsx`) with that route's own `roles`, and `RoleLayout`
   (`src/components/layouts/RoleLayout.tsx`) reads the shell + nav for the signed-in role
-  from the same file. See `pages/member/` (`ROLES.MEMBER`) and `pages/admin/`
-  (`ROLES.ADMIN`) for the reference shape. For a one-off protected route deliberately kept
+  from the same file. See `pages/member/` (`Role.MEMBER`) and `pages/admin/`
+  (`Role.ADMIN`) for the reference shape. For a one-off protected route deliberately kept
   outside the registry, `AuthenticatedRoute`/`AuthRedirectRoute` (`src/routes/`) are still
   there standalone. `Can` (`src/components/common/Can.tsx`) is the separate inline-UI-level
   gate (hide/show a fragment of an already-rendered page).
-- Data fetching → a TanStack Query hook (never a raw `useEffect` fetch). Failures toast
-  automatically via `queryClient.ts`; opt out per-call with `meta: { skipErrorToast: true }`.
+- A page reachable whether signed in or not, and not part of the guest-only auth flow either
+  (the shipped example: `ForbiddenPage`, `ExamplePage`) → this is neither
+  `ProtectedRoutes.tsx` nor `PublicRoutes.tsx` — it's its own hardcoded `<Route>` inside
+  `AppRouters.tsx`'s public shell block (the `<Route path="/" element={<AppLayout />}>`
+  group alongside `ForbiddenPage`/the catch-all 404). No registry entry, no auth guard, no
+  `AuthRedirectRoute` wrapper — deliberate, since these pages have nothing to gate.
+  `ExamplePage` (the reference feature every new list/search screen copies) is wired exactly
+  this way, not through `ProtectedRoutes.tsx`. `"/"` itself lives in this same block but
+  isn't an instance of this category — it has no content of its own to gate because it's
+  never real content at all; see `HomeRedirectRoute.tsx` above.
+- Data fetching → a TanStack Query hook (never a raw `useEffect` fetch), placed under
+  `src/hooks/<concern>/` — never co-located inside the feature's own component folder.
+  `<concern>` is `common/` when the hook is genuinely cross-role (e.g. a feature reachable
+  by every role, or truly generic logic) or a role name when the hook only ever makes
+  sense inside that role's own pages — the same decision `src/components/<concern>/`
+  already makes, applied identically here. `src/hooks/common/useExampleItems.ts` (plus its
+  three mutation-hook siblings) is the reference shape. Failures toast automatically via
+  `queryClient.ts`; opt out per-call with `meta: { skipErrorToast: true }`.
 - UI-only state → a Zustand store (feature-scoped when feature-specific).
 - Form + validation → React Hook Form + a Zod schema in `src/schemas/`, composed from
   `common.schema.ts` primitives where one already exists.
 - User-facing text → a key in `src/i18n/locales/<lng>/common.json`, read via
   `useTranslation()`'s `t('KEY')` (or `i18n.t('KEY')` outside a component, e.g. a Zod
   schema) — never hardcode a string in JSX.
-- API path → `src/constants/api-routes.ts`.
+- API path → a member on the relevant enum in `src/constants/api-routes.ts` (one enum per
+  route group, e.g. `AuthRoutes`, `ExampleRoutes` — a real `enum` can't nest, so a new group
+  is its own enum, not a new key on an existing one).
+- Query key → a member on `src/constants/queryKeys.ts`'s `QueryKey` enum, referenced directly
+  from the feature's query hook — never a per-feature key factory.
 - A new env var → add it to `.env.example`, `src/vite-env.d.ts`, and the Zod schema in
   `src/constants/env.ts` — an unvalidated `import.meta.env.VITE_X` read is not allowed.
 
@@ -159,6 +244,43 @@ Where things go — quick answers for "where does X go?":
 - **Hooks:** camelCase with `use` prefix (`useDebouncedValue.ts`).
 - **Utils:** camelCase (`getPageCount.ts`).
 - **Stores:** `useXStore` in `camelCaseStore.ts`.
+
+---
+
+## Constant Registries
+
+A closed set of named string values — a role registry, an API-route table, a query-key
+registry, or any similar fixed set a new feature introduces — is a real TypeScript `enum`,
+not an `as const` object:
+
+```ts
+export enum Role {
+  MEMBER = 'MEMBER',
+  ADMIN = 'ADMIN',
+}
+```
+
+- **One flat enum per concern.** A real `enum` can't nest, so a grouped registry (the old
+  single `API_ROUTES` object) becomes one enum per group instead — `AuthRoutes`,
+  `ExampleRoutes` — not one enum trying to hold sub-objects. `Role` (`src/routes/roles.ts`)
+  and `QueryKey` (`src/constants/queryKeys.ts`) are the flat reference shapes;
+  `AuthRoutes`/`ExampleRoutes` (`src/constants/api-routes.ts`) is the multi-group shape.
+- **`enum`, never `const enum`.** This repo's `isolatedModules`/`verbatimModuleSyntax`
+  (`tsconfig.app.json`/`tsconfig.node.json`) transpile file-by-file via esbuild, which does not
+  support `const enum` inlining — using one either errors or silently falls back to a real
+  runtime object anyway, so it buys nothing here.
+- **Comparing an enum against an untyped external string needs a boundary cast.** Unlike an
+  `as const` object's string-literal type, an `enum` member is nominal — a plain string from
+  a decoded JWT, an API response, or an MSW fixture is not automatically assignable to it, and
+  `@typescript-eslint/no-unsafe-enum-comparison` (part of this repo's `strictTypeChecked` lint
+  config) flags comparing the two without one. Cast at the exact comparison, the same way
+  `roles.ts`'s own `isRole` type guard does (`value as Role`) and `ProtectedRoutes.tsx`/
+  `RoleGuards.tsx` do when checking a role read off `AuthUser.role: string` — never widen the
+  enum-typed side to `string` just to silence it.
+- **A value assigned _into_ a plain `string`-typed field needs no cast** — a string enum
+  member is itself a `string`, so `role: Role.ADMIN` satisfies `AuthUser['role']` (or any
+  other `string` field/param) with no cast; the boundary-cast rule above only applies to the
+  reverse direction (external string → enum).
 
 ---
 
@@ -185,15 +307,16 @@ Where things go — quick answers for "where does X go?":
 - **Server state:** TanStack Query only. Validate payloads with Zod at the boundary. Errors
   toast automatically (`queryClient.ts`'s `QueryCache`/`MutationCache` `onError`) — opt a
   specific call out with `meta: { skipErrorToast: true }` when it renders its own inline error.
-- **Query keys:** co-locate a key factory with its hook (never a global `queryKeys.ts`),
-  structured generic-to-specific so every level is independently invalidatable:
+- **Query keys:** every query key is a named member of the single global registry
+  `src/constants/queryKeys.ts` (`QueryKey`), referenced directly in a feature's `queryKey`
+  array — never a per-feature key factory, never an inline string literal in the hook itself:
   ```ts
-  export const exampleKeys = {
-    all: ['example'] as const,
-    lists: () => [...exampleKeys.all, 'list'] as const,
-    list: (params: Params) => [...exampleKeys.lists(), params] as const,
-  };
+  export enum QueryKey {
+    EXAMPLE_LIST = 'example-list',
+  }
   ```
+  A feature's hook imports the member it needs (`queryKey: [QueryKey.EXAMPLE_LIST, params]`) —
+  adding a new query starts with adding its member to that one file, not inventing a local key.
   Wrap every `useQuery` in a custom hook — never call it directly in a component. Every
   variable read inside `queryFn` must also be in `queryKey` (treat it like a `useEffect`
   dependency array). Use `placeholderData: keepPreviousData` for paginated/filtered queries.
@@ -201,9 +324,14 @@ Where things go — quick answers for "where does X go?":
   against a list something on screen already reads via `useQuery`) — confirm success with
   `toast.success(...)` inside the hook's `useMutation({ onSuccess })`, then `return` the result
   of `queryClient.invalidateQueries(...)` from that same `onSuccess` so the mutation stays
-  pending until the refetch lands. This is exactly the class of bug `react-doctor`'s
+  pending until the refetch lands. **`src/components/example/`'s `useCreateExampleItem.ts`/
+  `useUpdateExampleItem.ts`/`useDeleteExampleItem.ts` are the reference implementation of this
+  exact pattern** — copy their shape (one small mutation hook per operation,
+  `useQueryClient()` from React context, never the app's shared `queryClient` singleton import)
+  for any new create/update/delete hook. This is exactly the class of bug `react-doctor`'s
   `query-mutation-missing-invalidation` rule catches — found four real instances of it in this
-  boilerplate's own Auth forms during a QA pass; a one-off action with nothing cached to
+  boilerplate's own Auth forms during a QA pass, which is what prompted adding the
+  `ExampleWidget` CRUD reference in the first place; a one-off action with nothing cached to
   invalidate (this repo's `signup`/`forgotPassword`/etc.) is a legitimate exception, not
   something to fake an invalidation call for. Prefer `mutate` over `mutateAsync`; if you must
   use `mutateAsync`, append `.catch(() => {})` (the global `onError` already toasts) instead of
@@ -222,6 +350,10 @@ Where things go — quick answers for "where does X go?":
   empty value and a malformed one get distinct messages. `.refine()`'s object form takes
   `{ error, path }`, not `{ message, path }` (v3). Build create/update/filter schema variants
   off one base with `.extend()`/`.pick()`/`.omit()`/`.partial()` — never re-declare fields.
+  The same composition is the intended approach for nested/related data too (e.g. an item
+  with its own one-to-many sub-list) — a nested field is just `z.array(subItemSchema)` (or
+  `subItemSchema` directly) inside `.extend()`, same as any other field; no example of this
+  ships yet, but nothing about the pattern changes shape for it.
 - The Axios client (`api-client.ts`) owns auth-token attach and error normalization
   (`ApiError`); on a 401 from any non-auth-flow route it runs a single-flight
   refresh-and-retry (see `docs/auth-token-refresh.md` — the pattern documented there is the
@@ -298,7 +430,12 @@ Two kinds of test, two different naming/location rules:
    in the name is deliberate: it marks "this is an end-to-end flow test," not a unit test, at
    a glance. A feature that splits into multiple pieces (e.g. `AddManagerModal.tsx`,
    `EditManagerModal.tsx`) gets one `<Piece>.workflow.test.tsx` per piece, in that same
-   feature folder — never a separate parallel test-only folder. Cover the real flow: initial
+   feature folder — never a separate parallel test-only folder — see
+   `src/components/example/`'s own `AddExampleItemModal.workflow.test.tsx`/
+   `EditExampleItemModal.workflow.test.tsx`/`DeleteExampleItemButton.workflow.test.tsx` for
+   the real (not hypothetical) reference shape, including asserting the list itself changes
+   after a create/update/delete — not just that the mutation resolved — which is the actual
+   point of testing the invalidation wiring from the Mutations bullet above. Cover the real flow: initial
    load, the primary interaction (search/submit/toggle/...), and its success/empty/error/
    cancel edge cases — through Testing Library queries (`getByRole`/`getByLabelText`, not
    `getByTestId` or DOM internals) driven by real `@testing-library/user-event` interactions,
@@ -315,10 +452,19 @@ Two kinds of test, two different naming/location rules:
    interceptors, `authService`, generic hooks), so it's tested standalone rather than only
    incidentally through whichever workflow happens to exercise it. Services still go through
    real MSW handlers (never a direct `apiClient`/axios mock) — `src/services/api-client.test.ts`
-   and `authService.test.ts` are the reference shape. Hooks use React Testing Library's
+   and `src/services/auth/authService.test.ts` are the reference shape. Hooks use React
+   Testing Library's
    `renderHook` (`@testing-library/react`); a hook with a timer uses `vi.useFakeTimers()` +
    `vi.advanceTimersByTime(...)`, never a real `setTimeout` wait — `useDebouncedValue.test.ts`
    is the reference shape.
+3. **Utility tests** — `*.test.ts`, co-located next to the file, for every pure function in
+   `src/utils/` — the same standalone-test standard as `src/services/`/`src/hooks/` above,
+   for the same reason (`src/utils/`'s own directory-map entry already calls these functions
+   "100% unit-testable"; the standard was previously true but unstated). No React rendering
+   needed — call the function directly and assert on its return value, covering the normal
+   case plus every edge case/guard clause the function actually branches on. Plain `describe`/
+   `it`/`expect`, no `renderHook`/`renderWithProviders` — `getPageCount.test.ts` is the
+   reference shape.
 
 **What to avoid:** a standalone test for a `src/components/common/` primitive; testing
 implementation details (state variable names, internal hook call counts, snapshot tests of
@@ -361,14 +507,14 @@ decides what to run.
 
 **Requirement → test-layer mapping:**
 
-| What you're testing                                            | Layer                                                                                    |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| A feature's user-facing flow (load → interact → success/error) | Vitest + RTL workflow test (`*.workflow.test.tsx`)                                       |
-| `src/services/`/`src/hooks/` logic shared across features      | Vitest, standalone `*.test.ts`                                                           |
-| The app actually boots, in a real browser                      | Playwright (`e2e/smoke.spec.ts`)                                                         |
-| A real network round trip through the MSW **browser** worker   | Playwright                                                                               |
-| Accessibility — component level                                | RTL's `getByRole`/`getByLabelText` queries (a mislabeled element simply fails the query) |
-| Accessibility — route level                                    | Playwright + axe-core (`checkA11y()` in `e2e/fixtures.ts`)                               |
+| What you're testing                                                    | Layer                                                                                    |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| A feature's user-facing flow (load → interact → success/error)         | Vitest + RTL workflow test (`*.workflow.test.tsx`)                                       |
+| `src/services/`/`src/hooks/`/`src/utils/` logic shared across features | Vitest, standalone `*.test.ts`                                                           |
+| The app actually boots, in a real browser                              | Playwright (`e2e/smoke.spec.ts`)                                                         |
+| A real network round trip through the MSW **browser** worker           | Playwright                                                                               |
+| Accessibility — component level                                        | RTL's `getByRole`/`getByLabelText` queries (a mislabeled element simply fails the query) |
+| Accessibility — route level                                            | Playwright + axe-core (`checkA11y()` in `e2e/fixtures.ts`)                               |
 
 A component-level unit test (isolated `Button`/`Input`/etc.) is not on this table on purpose
 — see the philosophy note above.
@@ -389,6 +535,8 @@ Doctor, the build, the browser smoke-gate (see § Quality Gate).
 
 All visual values come from the `@theme` block in `src/index.css` (colors, radius, spacing,
 type). Re-skin a project by editing tokens there — never by hardcoding values in components.
+See `docs/design-guidelines.md` for the flat-by-default rule, the typography hierarchy, and
+component-specific styling conventions (buttons, dialogs, navigation).
 
 - **Never hoist a class string to share it.** The failure mode this guards against: a call
   site needs a look a common component doesn't offer, so someone pulls the classes into a
@@ -412,7 +560,7 @@ Subject: lower-case start, no trailing period, ≤ 72 chars. Example:
 
 ## The Quality Gate — one canonical contract: `pnpm verify`
 
-`pnpm verify` is **the** definition of "ready to merge." It chains fifteen checks, each its
+`pnpm verify` is **the** definition of "ready to merge." It chains sixteen checks, each its
 own non-mutating `check:*`/`ai:check`/`static-analysis:contract` script in `package.json`,
 always run full-repo:
 
@@ -437,17 +585,36 @@ lint-config-contract.mjs`) — the guard against someone downgrading a rule to t
    hardening features (Playwright browser-quality gate, Agent Execution Safety, pnpm
    supply-chain) depend on haven't silently drifted (`scripts/checks/hardening-contract.mjs`)
    — grouped here with the other `*-contract` checks, before anything more expensive runs.
-6. `check:types` — `tsc -b --noEmit` (strict; see this section's TypeScript/ESLint strictness
+6. `check:i18n` — two checks over every `src/i18n/locales/<lng>/common.json` that exists
+   (`scripts/checks/i18n-key-contract.mjs`), not just `en` — a static regex scan, grouped
+   with the other cheap `*-contract` checks before anything type-checked/expensive runs:
+   - **Orphaned keys** — every key must be referenced somewhere in `src/`. Deliberately
+     the _unused-key_ direction, not "does every `t()` call resolve" — that direction is
+     already a hard `tsc -b` compile error on its own, via i18next's own TypeScript
+     integration (the `CustomTypeOptions`/`resources` module augmentation in
+     `src/i18n/index.ts` types `t()`'s argument as the literal union of every real key),
+     so a second check duplicating it would have no real job. An orphaned key — still
+     defined, nothing references it anymore — is the genuine gap nothing else in this
+     gate catches.
+   - **Cross-locale key parity** — every non-`en` locale's key set must exactly match
+     `en`'s (`en` is the source of truth: `src/i18n/index.ts`'s own `fallbackLng: 'en'`
+     and its "keys must match exactly" instruction for adding a language). Catches a
+     locale silently missing a translation (i18next falls back to `en`'s string,
+     masking it) or carrying a stale extra key, the moment a second locale is added —
+     only `en` ships today, but the check already covers every locale that exists, not
+     just the first one, so this doesn't silently stop working the day a second
+     language is added.
+7. `check:types` — `tsc -b --noEmit` (strict; see this section's TypeScript/ESLint strictness
    bullets below for exactly how strict).
-7. `check:test` — `vitest run` (see § Testing). Placed right after `check:types` and before
+8. `check:test` — `vitest run` (see § Testing). Placed right after `check:types` and before
    the lint/format/style stages: a broken component is a more valuable signal to catch early
    than a lint nit, and it should block before `check:build` (the most expensive stage) even
    starts, not after.
-8. `check:lint` — ESLint (hooks, `jsx-key`, prop types, hardcoded text, tokens).
-9. `check:a11y` — strict `jsx-a11y` pass.
-10. `check:format` — Prettier, check-only.
-11. `check:style` — `impeccable detect` (`< /dev/null` — see § Non-interactive by design below).
-12. `check:doctor` — `react-doctor` (`--no-supply-chain` skips the Socket.dev scan for speed,
+9. `check:lint` — ESLint (hooks, `jsx-key`, prop types, hardcoded text, tokens).
+10. `check:a11y` — strict `jsx-a11y` pass.
+11. `check:format` — Prettier, check-only.
+12. `check:style` — `impeccable detect` (`< /dev/null` — see § Non-interactive by design below).
+13. `check:doctor` — `react-doctor` (`--no-supply-chain` skips the Socket.dev scan for speed,
     run `pnpm doctor` for the full scan including that check; `--yes` — see below). **Only
     `error`-severity findings fail this check.** `doctor.config.ts` sets `blocking: 'error'`
     (react-doctor's own default), so a warning-only finding — e.g. this boilerplate's own
@@ -456,11 +623,11 @@ lint-config-contract.mjs`) — the guard against someone downgrading a rule to t
     output and lowers the score, but does **not** fail `check:doctor`, `verify`, or CI. This is
     intentional, not a gap: warnings are advisory. Run `pnpm exec react-doctor --blocking warning`
     to audit warnings as if they were blocking, but that is not what `verify`/CI enforce.
-13. `check:build` — the production build succeeds (`vite build`, mode `production`).
-14. `check:build-budget` — `size-limit` (see § Performance Budget) against the real
+14. `check:build` — the production build succeeds (`vite build`, mode `production`).
+15. `check:build-budget` — `size-limit` (see § Performance Budget) against the real
     `dist/assets/` output from the `check:build` step just before it — a separate, blocking
     gate from Vite's own advisory `chunkSizeWarningLimit` (`vite.config.ts`), which stays as-is.
-15. `check:e2e` — `playwright test` (see § Testing). Deliberately **last**: it needs a real
+16. `check:e2e` — `playwright test` (see § Testing). Deliberately **last**: it needs a real
     production build to serve (`pnpm build:e2e` — its own `dist-e2e/`, kept separate from
     `check:build`'s `dist/` so neither disturbs the other), and it's the single most expensive
     check in the chain (a real Chromium browser boot + build), so every cheaper check gets to
@@ -715,11 +882,15 @@ not a discussion; see § Checks vs Fixes above for the command-mutation half of 
 - Commands: author once in `.claude/commands/*.md`; `pnpm ai:sync` mirrors them to
   `.cursor/commands/` (frontmatter stripped) — `pnpm ai:check` (part of `verify`) fails CI if
   a source file changed without a re-sync. Set: `/fix-commit`, `/fe-api-guide`,
-  `/new-component`, `/new-feature`, `/a11y-audit`, `/perf-audit`, `/code-review`,
-  `/theme-setup`, `/debug`, `/prototype`.
+  `/new-component`, `/new-feature`, `/new-page`, `/a11y-audit`, `/perf-audit`, `/code-review`,
+  `/theme-setup`, `/debug`, `/prototype`, `/project-identity`.
 - Skills live once in `.claude/skills/` (Cursor loads this folder too). Set: `fe-fix-commit`,
-  `fe-api-guide`, `fe-component-scaffold`, `fe-a11y-audit`, `fe-prototype`, `fe-debug`,
-  `fe-theme-setup`. Every skill has a matching `.claude/commands/*.md` entry point so Cursor
-  (which has no skill auto-discovery of its own) can still reach it explicitly — `code-review`
-  and `perf-audit` are the two commands with no backing skill file, self-contained instead.
+  `fe-api-guide`, `fe-component-scaffold`, `fe-page-scaffold`, `fe-a11y-audit`, `fe-prototype`,
+  `fe-debug`, `fe-theme-setup`, `fe-project-identity`. Every skill has a matching
+  `.claude/commands/*.md` entry point so Cursor (which has no skill auto-discovery of its own)
+  can still reach it explicitly — `code-review` and `perf-audit` are the two commands with no
+  backing skill file, self-contained instead. `fe-page-scaffold` is the one skill that invokes
+  another skill itself (`fe-component-scaffold`, once per decomposed piece) rather than being
+  invoked standalone for a whole build — see its own file for why (`AGENTS.md` doesn't
+  duplicate the reasoning here, per this file's own "point at the source, don't copy" rule).
 - When blocked by the gate, run `/fix-commit` — it fixes the code, never disables checks.

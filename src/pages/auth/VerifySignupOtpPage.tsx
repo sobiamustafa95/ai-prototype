@@ -2,8 +2,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Seo } from 'src/components/common/Seo';
 import { OtpForm } from 'src/components/auth/OtpForm';
-import { authService } from 'src/services/authService';
-import { useAuthStore } from 'src/stores/authStore';
+import { useResendSignupOtp, useVerifyOtp } from 'src/hooks/auth/useAuth';
 import { getHomeRouteForRole } from 'src/routes/ProtectedRoutes';
 
 interface LocationState {
@@ -14,9 +13,10 @@ interface LocationState {
 export function VerifySignupOtpPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const setSession = useAuthStore((state) => state.setSession);
   const email = (location.state as LocationState | null)?.email;
   const { t } = useTranslation();
+  const verifyOtp = useVerifyOtp();
+  const resendOtp = useResendSignupOtp();
 
   // No email in state means this route was hit directly, not via signup — send
   // the user back to start the flow properly instead of rendering a broken form.
@@ -32,11 +32,11 @@ export function VerifySignupOtpPage() {
       <OtpForm
         email={email}
         onVerify={async (otp) => {
-          const { user, tokens } = await authService.verifySignupOtp({ email, otp });
-          setSession(user, tokens);
+          // useVerifyOtp's own onSuccess already sets the session (src/hooks/auth/useAuth.ts).
+          const { user } = await verifyOtp.mutateAsync({ email, otp });
           void navigate(getHomeRouteForRole(user.role), { replace: true });
         }}
-        onResend={() => authService.resendSignupOtp({ email })}
+        onResend={() => resendOtp.mutateAsync({ email })}
       />
     </>
   );

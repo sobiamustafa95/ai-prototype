@@ -71,12 +71,12 @@ so everything runs out of the box.
                      git push                  fix code, commit again
                           │
                           ▼
-                 GitHub CI runs `pnpm verify` — all 11 checks, full-repo
+                 GitHub CI runs `pnpm verify` — all 16 checks, full-repo
 ```
 
-`pnpm verify` is the single canonical definition of the gate — 11 checks, each its own
-`check:*`/`ai:check` script in `package.json` (see § 7). Every entry point runs the exact same
-rule set:
+`pnpm verify` is the single canonical definition of the gate — 16 checks, each its own
+`check:*`/`ai:check`/`static-analysis:contract` script in `package.json` (see § 7). Every
+entry point runs the exact same rule set:
 
 - **Locally, on demand:** `pnpm verify` runs all 11, full-repo.
 - **Locally, on commit:** the Husky hook (`scripts/hooks/pre-commit.mjs`) runs most of them,
@@ -104,20 +104,29 @@ src/
                   right shell for whichever role is signed in, driven by
                   routes/ProtectedRoutes.tsx)
   pages/
-    common/       Pages reachable by every role (HomePage, ForbiddenPage, ExamplePage, and
+    common/       Pages reachable by every role (ForbiddenPage, ExamplePage, and
                   the common routes every role's sidebar links to: Settings/Profile/
-                  Notifications — `roles: 'all'` in routes/ProtectedRoutes.tsx)
+                  Notifications — `roles: 'all'` in routes/ProtectedRoutes.tsx). "/" itself
+                  is routes/HomeRedirectRoute.tsx, an auth-aware redirect, not a page here.
     auth/         The 5 Auth pages (route-level glue only)
     <role>/       Pages owned by one role — mirrors components/<role>/. Ships with two
-                  placeholders: member/ (ROLES.MEMBER) and admin/ (ROLES.ADMIN)
-  hooks/          Generic reusable hooks (e.g. useDebouncedValue, useThemeSync,
-                  useSyncAuthAcrossTabs)
+                  placeholders: member/ (Role.MEMBER) and admin/ (Role.ADMIN)
+  hooks/<concern>/ Every hook — src/hooks/<concern>/<hookName>.ts. common/ for generic or
+                  cross-role hooks (useDebouncedValue, useThemeSync, useSyncAuthAcrossTabs,
+                  and every feature-data hook, e.g. useExampleItems — never co-located in
+                  the feature folder), auth/ (useAuth.ts — every auth mutation hook: useLogin,
+                  useSignup, useLogout, useForgotPassword, useResetPassword, useVerifyOtp,
+                  plus two supporting exports for the forgot-password OTP flow), or a role
+                  name for one specific to that role's own pages
   lib/            utils.ts — the cn() class-merge helper used by every common component
-  services/       api-client (Axios, bearer attach + refresh-and-retry), queryClient,
-                  authService (real /auth contract)
+  services/<concern>/ api-client.ts and queryClient.ts stay at services/ root (cross-cutting
+                  infrastructure, not a "concern"); auth/authService.ts (real /auth
+                  contract) is the one concern folder today
   utils/          Pure helper functions (easy to unit-test)
   schemas/        Zod schemas (form + API validation); common.schema.ts for shared primitives
-  types/          Shared TypeScript interfaces
+  types/<concern>/ Shared TypeScript interfaces — common/ for cross-concern types
+                  (ApiResponse, Paginated), auth/ for auth-scoped types (AuthUser,
+                  AuthTokens)
   constants/      api-routes.ts, config.ts, env.ts (Zod-validated env)
   i18n/           i18next setup + locales/<lng>/common.json — the only source of text
   routes/         roles.ts (the Role registry) + ProtectedRoutes.tsx (every protected page,
@@ -147,22 +156,22 @@ docs/                          This guide, onboarding, deep-dive docs
 
 **Quick answers to "where does X go?"**
 
-| I want to add…          | Put it in…                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------- |
-| A reusable button/input | `src/components/common/`                                                        |
-| A whole screen/feature  | Copy `src/components/example/` + `pages/common/ExamplePage.tsx`, rename, gut it |
-| Data fetching           | A TanStack Query hook (never a raw `useEffect` fetch)                           |
-| UI-only state           | A Zustand store                                                                 |
-| A form                  | React Hook Form + a Zod schema in `src/schemas/`                                |
-| User-facing text        | A key in `src/i18n/locales/<lng>/common.json`, via `t()`                        |
-| An API path             | `src/constants/api-routes.ts`                                                   |
-| A pure helper           | `src/utils/`                                                                    |
+| I want to add…          | Put it in…                                                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| A reusable button/input | `src/components/common/`                                                                                                   |
+| A whole screen/feature  | Copy `src/components/example/` + `pages/common/ExamplePage.tsx`, rename, gut it                                            |
+| Data fetching           | A TanStack Query hook under `src/hooks/<concern>/` (never a raw `useEffect` fetch, never co-located in the feature folder) |
+| UI-only state           | A Zustand store                                                                                                            |
+| A form                  | React Hook Form + a Zod schema in `src/schemas/`                                                                           |
+| User-facing text        | A key in `src/i18n/locales/<lng>/common.json`, via `t()`                                                                   |
+| An API path             | `src/constants/api-routes.ts`                                                                                              |
+| A pure helper           | `src/utils/`                                                                                                               |
 
 ---
 
-## 7. The Quality Gate — `pnpm verify` (15 checks)
+## 7. The Quality Gate — `pnpm verify` (16 checks)
 
-`pnpm verify` chains these 15 checks, each its own non-mutating `check:*`/`ai:check`/
+`pnpm verify` chains these 16 checks, each its own non-mutating `check:*`/`ai:check`/
 `static-analysis:contract` script. Any failure blocks a merge — and, run staged-file-scoped
 via the commit hook, blocks a commit (except `check:test`/`check:e2e` — see the note below):
 
@@ -176,23 +185,26 @@ via the commit hook, blocks a commit (except `check:test`/`check:e2e` — see th
    silently regressed.
 5. `check:hardening` — asserts the config/doc details behind three previously-shipped hardening
    features (Playwright, Agent Execution Safety, pnpm supply-chain) haven't silently drifted.
-6. `check:types` — TypeScript strict check (`tsc -b --noEmit`).
-7. `check:test` — `vitest run` (Vitest + React Testing Library). Runs right after types, before
+6. `check:i18n` — orphaned-key + cross-locale-parity check over every `src/i18n/locales/<lng>/
+common.json` that exists (see `AGENTS.md` § The Quality Gate for exactly what each half
+   catches).
+7. `check:types` — TypeScript strict check (`tsc -b --noEmit`).
+8. `check:test` — `vitest run` (Vitest + React Testing Library). Runs right after types, before
    the lint/format/style stages — a broken component matters more than a lint nit, and it
    should block the expensive `check:build` step from even starting.
-8. `check:lint` — ESLint, on `tseslint.configs.strictTypeChecked` (React hooks rules, keys, no
+9. `check:lint` — ESLint, on `tseslint.configs.strictTypeChecked` (React hooks rules, keys, no
    hardcoded text, design tokens only).
-9. `check:a11y` — strict `jsx-a11y` rules (WCAG 2.1 AA).
-10. `check:format` — Prettier, check-only.
-11. `check:style` — `impeccable detect`.
-12. `check:doctor` — `react-doctor` (the Socket.dev supply-chain scan is skipped here for speed;
+10. `check:a11y` — strict `jsx-a11y` rules (WCAG 2.1 AA).
+11. `check:format` — Prettier, check-only.
+12. `check:style` — `impeccable detect`.
+13. `check:doctor` — `react-doctor` (the Socket.dev supply-chain scan is skipped here for speed;
     run `pnpm doctor` for the full scan).
-13. `check:build` — the production build succeeds.
-14. `check:build-budget` — `size-limit` against the real `dist/assets/` output (see `AGENTS.md`
+14. `check:build` — the production build succeeds.
+15. `check:build-budget` — `size-limit` against the real `dist/assets/` output (see `AGENTS.md`
     § Performance Budget for the numbers and how to diagnose a failure). Right after
     `check:build` since it needs that build's output; a separate, blocking gate from Vite's own
     advisory `chunkSizeWarningLimit`.
-15. `check:e2e` — `playwright test`, Chromium-only smoke-gate against the real production build
+16. `check:e2e` — `playwright test`, Chromium-only smoke-gate against the real production build
     (`pnpm build:e2e` → `vite preview`). Last on purpose — needs a build to serve, and it's the
     single most expensive check, so every cheaper one fails fast first.
 
@@ -209,22 +221,22 @@ hook uses: `pnpm gate`.
 
 ## 8. Everyday commands
 
-| Command                      | What it does                                                                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                   | Start the dev server                                                                                                                        |
-| `pnpm build` / `preview`     | Production build / preview it                                                                                                               |
-| `pnpm verify`                | **The** canonical gate — all 15 checks, full-repo (see § 7)                                                                                 |
-| `pnpm gate`                  | Most of the same checks, scoped to staged files (what commit runs) — not `check:test`/`check:e2e`, see § 7                                  |
-| `pnpm check:<name>`          | Run one check standalone (`guardrails`/`lint-contract`/`types`/`test`/`lint`/`a11y`/`format`/`style`/`doctor`/`build`/`build-budget`/`e2e`) |
-| `pnpm test`                  | Vitest in watch mode, for local dev (not part of `verify` — `check:test` is)                                                                |
-| `pnpm test:run`              | Vitest, single run (same as `check:test`; part of `verify`)                                                                                 |
-| `pnpm test:e2e`              | Playwright, Chromium-only smoke-gate (same as `check:e2e`; part of `verify`)                                                                |
-| `pnpm build:e2e`             | Builds the app with `VITE_E2E=true` to `dist-e2e/` — what `test:e2e` serves via `vite preview`                                              |
-| `pnpm lint` / `format`       | Check-only, non-mutating (same as `check:lint`/`check:format`; part of `verify`)                                                            |
-| `pnpm lint:fix`/`format:fix` | The mutating versions — actually write the fixes to disk                                                                                    |
-| `pnpm doctor`                | React Doctor full scan, incl. the Socket.dev supply-chain check (manual, not part of `verify`)                                              |
-| `pnpm ai:sync`               | Rebuild `.cursor/commands` from `.claude/commands` (mutating)                                                                               |
-| `pnpm ai:check`              | Verify `.cursor/commands` isn't stale (non-mutating; part of `verify`)                                                                      |
+| Command                      | What it does                                                                                                                                                   |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                   | Start the dev server                                                                                                                                           |
+| `pnpm build` / `preview`     | Production build / preview it                                                                                                                                  |
+| `pnpm verify`                | **The** canonical gate — all 16 checks, full-repo (see § 7)                                                                                                    |
+| `pnpm gate`                  | Most of the same checks, scoped to staged files (what commit runs) — not `check:test`/`check:e2e`, see § 7                                                     |
+| `pnpm check:<name>`          | Run one check standalone (`guardrails`/`lint-contract`/`hardening`/`i18n`/`types`/`test`/`lint`/`a11y`/`format`/`style`/`doctor`/`build`/`build-budget`/`e2e`) |
+| `pnpm test`                  | Vitest in watch mode, for local dev (not part of `verify` — `check:test` is)                                                                                   |
+| `pnpm test:run`              | Vitest, single run (same as `check:test`; part of `verify`)                                                                                                    |
+| `pnpm test:e2e`              | Playwright, Chromium-only smoke-gate (same as `check:e2e`; part of `verify`)                                                                                   |
+| `pnpm build:e2e`             | Builds the app with `VITE_E2E=true` to `dist-e2e/` — what `test:e2e` serves via `vite preview`                                                                 |
+| `pnpm lint` / `format`       | Check-only, non-mutating (same as `check:lint`/`check:format`; part of `verify`)                                                                               |
+| `pnpm lint:fix`/`format:fix` | The mutating versions — actually write the fixes to disk                                                                                                       |
+| `pnpm doctor`                | React Doctor full scan, incl. the Socket.dev supply-chain check (manual, not part of `verify`)                                                                 |
+| `pnpm ai:sync`               | Rebuild `.cursor/commands` from `.claude/commands` (mutating)                                                                                                  |
+| `pnpm ai:check`              | Verify `.cursor/commands` isn't stale (non-mutating; part of `verify`)                                                                                         |
 
 ---
 
@@ -233,7 +245,10 @@ hook uses: `pnpm gate`.
 **Don't start from scratch — copy the example.**
 
 1. Copy `src/components/example/` to a new folder, e.g. `src/components/UserProfile/`, and
-   copy `src/pages/common/ExamplePage.tsx` for the matching thin route wrapper.
+   copy `src/pages/common/ExamplePage.tsx` for the matching thin route wrapper. Also copy
+   its hooks — `src/hooks/common/useExampleItems.ts` and its three mutation-hook siblings —
+   into `src/hooks/<concern>/` for your new feature (hooks live under `src/hooks/`, not the
+   component folder, so they don't come along automatically with step 1's copy).
 2. Rename files and the component, then replace the logic with yours.
 3. It already wires up: typed props, a TanStack Query hook, a Zustand store, a form with Zod
    validation, full accessibility, and a README.

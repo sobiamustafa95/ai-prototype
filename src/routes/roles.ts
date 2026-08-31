@@ -10,9 +10,7 @@
  * exactly two example roles ("a regular authenticated user" vs "an admin"),
  * both wired to placeholder pages, per AGENTS.md § zero business-domain lock-in.
  */
-export const ROLES = {
-  MEMBER: 'MEMBER',
-  ADMIN: 'ADMIN',
-} as const;
-
-export type Role = (typeof ROLES)[keyof typeof ROLES];
+export enum Role {
+  MEMBER = 'MEMBER',
+  ADMIN = 'ADMIN',
+}

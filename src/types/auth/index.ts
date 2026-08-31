@@ -1,22 +1,4 @@
-/**
- * Shared, domain-agnostic TypeScript contracts.
- * Types (unlike components) MAY be barrel-exported from this file.
- */
-
-/** Success envelope every `/auth/*` (and other module) response wraps its payload in. */
-export interface ApiResponse<TData> {
-  data: TData;
-  status: number;
-  message: string;
-}
-
-/** Generic cursor/offset pagination metadata. */
-export interface Paginated<TItem> {
-  items: TItem[];
-  page: number;
-  pageSize: number;
-  total: number;
-}
+/** Auth-scoped TypeScript contracts. Types (unlike components) MAY be barrel-exported. */
 
 /** Authenticated principal, matching the backend's `/auth` user shape. */
 export interface AuthUser {

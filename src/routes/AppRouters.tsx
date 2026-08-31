@@ -4,10 +4,10 @@ import { AppLayout } from 'src/components/layouts/AppLayout';
 import { AuthLayout } from 'src/components/layouts/AuthLayout';
 import { RoleLayout } from 'src/components/layouts/RoleLayout';
 import { ErrorLayout } from 'src/components/layouts/ErrorLayout';
-import { HomePage } from 'src/pages/common/HomePage';
 import { ForbiddenPage } from 'src/pages/common/ForbiddenPage';
 import { AuthRedirectRoute } from 'src/routes/AuthRedirectRoute';
 import { AuthenticatedRoute } from 'src/routes/AuthenticatedRoute';
+import { HomeRedirectRoute } from 'src/routes/HomeRedirectRoute';
 import { RoleGuards } from 'src/routes/RoleGuards';
 import { PUBLIC_ROUTES } from 'src/routes/PublicRoutes';
 import { PROTECTED_ROUTES } from 'src/routes/ProtectedRoutes';
@@ -29,9 +29,12 @@ function withSuspense(element: ReactNode) {
 export const router = createBrowserRouter(
   createRoutesFromElements(
     <>
-      {/* Public shell: home, 403, and anything reachable whether signed in or not. */}
+      {/* Public shell: 403, and anything reachable whether signed in or not. "/"
+          itself is never real content — HomeRedirectRoute always sends a
+          visitor on to their role's home route (signed in) or /login (signed
+          out); see src/routes/HomeRedirectRoute.tsx. */}
       <Route path="/" element={<AppLayout />} errorElement={<ErrorLayout />}>
-        <Route index element={<HomePage />} />
+        <Route index element={<HomeRedirectRoute />} />
         <Route path="403" element={<ForbiddenPage />} />
         <Route path="example" element={withSuspense(<ExamplePage />)} />
         {/* Catch-all: any unmatched path renders ErrorLayout's "Page not found" branch

@@ -7,7 +7,7 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
 }
 
-/** Generic prev/next pager — the shape `ExampleWidget` demonstrates inline; use this for new features. */
+/** Generic prev/next pager — `ExampleWidget` (src/components/example/) uses this directly; use it for new features too instead of hand-rolling the same prev/next block again. */
 export function Pagination({ page, pageCount, onPageChange }: PaginationProps) {
   const { t } = useTranslation();
   return (

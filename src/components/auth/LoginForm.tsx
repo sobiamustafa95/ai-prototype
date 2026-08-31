@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -6,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Input } from 'src/components/common/Input';
 import { PasswordInput } from 'src/components/common/PasswordInput';
 import { Button } from 'src/components/common/Button';
-import { useAuthStore } from 'src/stores/authStore';
+import { useLogin } from 'src/hooks/auth/useAuth';
 import { loginSchema, type LoginValues } from 'src/schemas/auth.schema';
 import { getHomeRouteForRole } from 'src/routes/ProtectedRoutes';
 
@@ -17,11 +16,8 @@ interface LocationState {
 export function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
-  const login = useAuthStore((state) => state.login);
-  const status = useAuthStore((state) => state.status);
-  const error = useAuthStore((state) => state.error);
-  const role = useAuthStore((state) => state.user?.role);
   const { t } = useTranslation();
+  const login = useLogin();
 
   const {
     register,
@@ -29,17 +25,18 @@ export function LoginForm() {
     formState: { errors },
   } = useForm<LoginValues>({ resolver: zodResolver(loginSchema) });
 
-  useEffect(() => {
-    if (status !== 'authenticated') return;
-    const from = (location.state as LocationState | null)?.from?.pathname;
-    void navigate(from ?? getHomeRouteForRole(role), { replace: true });
-  }, [status, navigate, location.state, role]);
-
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        void handleSubmit((values) => login(values))(event);
+        void handleSubmit((values) => {
+          login.mutate(values, {
+            onSuccess: ({ user }) => {
+              const from = (location.state as LocationState | null)?.from?.pathname;
+              void navigate(from ?? getHomeRouteForRole(user.role), { replace: true });
+            },
+          });
+        })(event);
       }}
       noValidate
     >
@@ -56,12 +53,12 @@ export function LoginForm() {
         error={errors.password?.message}
         {...register('password')}
       />
-      {error ? (
+      {login.isError ? (
         <p role="alert" className="text-danger text-sm">
-          {error}
+          {login.error instanceof Error ? login.error.message : t('ERROR')}
         </p>
       ) : null}
-      <Button type="submit" disabled={status === 'authenticating'}>
+      <Button type="submit" disabled={login.isPending}>
         {t('BUTTON_LOGIN')}
       </Button>
     </form>

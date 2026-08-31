@@ -29,8 +29,9 @@ ran and passed; look past it.
   `props: any`, no barrel `index.ts`, `cva()` for variants (not manual ternaries),
   tokens-only Tailwind (including inside `cva()` maps), no hardcoded strings
   (`t('KEY')` from `src/i18n/locales/`), no `as any`/`!`/`@ts-ignore`/`eslint-disable`.
-- **Data & State** (`AGENTS.md` § Data & State) — query keys co-located and
-  structured generic-to-specific; a mutation that touches cached data returns
+- **Data & State** (`AGENTS.md` § Data & State) — query keys defined on the global
+  `QueryKey` enum (`src/constants/queryKeys.ts`), never a per-feature key
+  factory or an inline string literal; a mutation that touches cached data returns
   `invalidateQueries(...)` from its `onSuccess`, with a matching success toast;
   Zod v4 top-level formats (`z.email()`, not `.email()` chained); `mutate` over
   `mutateAsync` unless there's a real reason.

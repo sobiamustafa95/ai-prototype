@@ -30,7 +30,10 @@ export function RoleGuards({ roles, component }: RoleGuardsProps) {
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-  if (roles !== 'all' && !roles.some((allowed) => allowed === user.role)) {
+  // user.role is an unvalidated string from the backend (AuthUser.role in
+  // src/types/index.ts) — cast to compare against the closed `Role` set, same
+  // boundary pattern as roles.ts's own `isRole`.
+  if (roles !== 'all' && !roles.some((allowed) => allowed === (user.role as Role))) {
     return <Navigate to="/403" replace />;
   }
   return <>{component}</>;

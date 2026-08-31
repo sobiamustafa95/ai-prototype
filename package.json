@@ -22,6 +22,7 @@
     "check:guardrails": "node scripts/checks/guard-rails.mjs",
     "check:lint-contract": "node scripts/checks/lint-config-contract.mjs",
     "check:hardening": "node scripts/checks/hardening-contract.mjs",
+    "check:i18n": "node scripts/checks/i18n-key-contract.mjs",
     "lint:check": "eslint . --max-warnings=0",
     "static-analysis:contract": "node scripts/check-static-analysis.mjs",
     "check:types": "tsc -b --noEmit",
@@ -42,7 +43,7 @@
     "check:e2e": "pnpm test:e2e",
     "typecheck": "pnpm check:types",
     "style:check": "pnpm check:style",
-    "verify": "pnpm check:guardrails && pnpm static-analysis:contract && pnpm ai:check && pnpm check:lint-contract && pnpm check:hardening && pnpm check:types && pnpm check:test && pnpm check:lint && pnpm check:a11y && pnpm check:format && pnpm check:style && pnpm check:doctor && pnpm check:build && pnpm check:build-budget && pnpm check:e2e",
+    "verify": "pnpm check:guardrails && pnpm static-analysis:contract && pnpm ai:check && pnpm check:lint-contract && pnpm check:hardening && pnpm check:i18n && pnpm check:types && pnpm check:test && pnpm check:lint && pnpm check:a11y && pnpm check:format && pnpm check:style && pnpm check:doctor && pnpm check:build && pnpm check:build-budget && pnpm check:e2e",
     "gate": "node scripts/hooks/pre-commit.mjs",
     "prepare": "husky"
   },
@@ -75,6 +76,7 @@
     "react-hook-form": "^7.85.0",
     "react-i18next": "^17.0.11",
     "react-router-dom": "^7.18.2",
+    "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.15"

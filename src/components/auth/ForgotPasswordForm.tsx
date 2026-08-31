@@ -1,11 +1,10 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Input } from 'src/components/common/Input';
 import { Button } from 'src/components/common/Button';
-import { authService } from 'src/services/authService';
+import { useForgotPassword } from 'src/hooks/auth/useAuth';
 import { forgotPasswordSchema, type ForgotPasswordValues } from 'src/schemas/auth.schema';
 
 export function ForgotPasswordForm() {
@@ -17,22 +16,19 @@ export function ForgotPasswordForm() {
     formState: { errors },
   } = useForm<ForgotPasswordValues>({ resolver: zodResolver(forgotPasswordSchema) });
 
-  const forgotPassword = useMutation({
-    mutationFn: (values: ForgotPasswordValues) => authService.forgotPassword(values),
-    meta: { skipErrorToast: true },
-    onSuccess: (_data, variables) => {
-      void navigate('/verify-forgot-password-otp', { state: { email: variables.email } });
-    },
-  });
+  const forgotPassword = useForgotPassword();
 
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        // .catch(() => {}) — the global onError already handles the error;
-        // without it a rejected mutateAsync is an unhandled promise rejection
-        // (AGENTS.md § Data & State).
-        void handleSubmit((values) => forgotPassword.mutateAsync(values).catch(() => {}))(event);
+        void handleSubmit((values) => {
+          forgotPassword.mutate(values, {
+            onSuccess: (_data, variables) => {
+              void navigate('/verify-forgot-password-otp', { state: { email: variables.email } });
+            },
+          });
+        })(event);
       }}
       noValidate
     >

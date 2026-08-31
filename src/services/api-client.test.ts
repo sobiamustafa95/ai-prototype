@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { server } from 'src/mocks/server';
-import { API_ROUTES } from 'src/constants/api-routes';
+import { AuthRoutes } from 'src/constants/api-routes';
 import { useAuthStore } from 'src/stores/authStore';
 import { apiClient } from './api-client';
 
@@ -26,20 +26,20 @@ function envelope(data: unknown) {
  */
 describe('apiClient', () => {
   afterEach(() => {
-    useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, status: 'idle' });
+    useAuthStore.setState({ user: null, accessToken: null, refreshToken: null });
   });
 
   it('attaches the access token as a Bearer header when one is set', async () => {
     useAuthStore.setState({ accessToken: 'test-access-token' });
     let receivedAuth: string | null = null;
     server.use(
-      http.get(API_ROUTES.AUTH.ME, ({ request }) => {
+      http.get(AuthRoutes.ME, ({ request }) => {
         receivedAuth = request.headers.get('authorization');
         return envelope(DEMO_USER);
       })
     );
 
-    await apiClient.get(API_ROUTES.AUTH.ME);
+    await apiClient.get(AuthRoutes.ME);
 
     expect(receivedAuth).toBe('Bearer test-access-token');
   });
@@ -47,13 +47,13 @@ describe('apiClient', () => {
   it('sends no Authorization header when there is no access token', async () => {
     let receivedAuth: string | null = 'not-checked-yet';
     server.use(
-      http.get(API_ROUTES.AUTH.ME, ({ request }) => {
+      http.get(AuthRoutes.ME, ({ request }) => {
         receivedAuth = request.headers.get('authorization');
         return envelope(DEMO_USER);
       })
     );
 
-    await apiClient.get(API_ROUTES.AUTH.ME);
+    await apiClient.get(AuthRoutes.ME);
 
     expect(receivedAuth).toBeNull();
   });
@@ -63,14 +63,14 @@ describe('apiClient', () => {
     let meCallCount = 0;
     let refreshCallCount = 0;
     server.use(
-      http.get(API_ROUTES.AUTH.ME, ({ request }) => {
+      http.get(AuthRoutes.ME, ({ request }) => {
         meCallCount += 1;
         if (request.headers.get('authorization') === 'Bearer expired-token') {
           return HttpResponse.json({ message: 'Token expired.' }, { status: 401 });
         }
         return envelope(DEMO_USER);
       }),
-      http.post(API_ROUTES.AUTH.REFRESH_TOKEN, () => {
+      http.post(AuthRoutes.REFRESH_TOKEN, () => {
         refreshCallCount += 1;
         return envelope({
           accessToken: 'new-access-token',
@@ -81,7 +81,7 @@ describe('apiClient', () => {
       })
     );
 
-    const response = await apiClient.get(API_ROUTES.AUTH.ME);
+    const response = await apiClient.get(AuthRoutes.ME);
 
     expect(response.status).toBe(200);
     expect(meCallCount).toBe(2);
@@ -97,16 +97,16 @@ describe('apiClient', () => {
     });
     let refreshCallCount = 0;
     server.use(
-      http.get(API_ROUTES.AUTH.ME, () =>
+      http.get(AuthRoutes.ME, () =>
         HttpResponse.json({ message: 'Token expired.' }, { status: 401 })
       ),
-      http.post(API_ROUTES.AUTH.REFRESH_TOKEN, () => {
+      http.post(AuthRoutes.REFRESH_TOKEN, () => {
         refreshCallCount += 1;
         return HttpResponse.json({ message: 'Refresh token expired.' }, { status: 401 });
       })
     );
 
-    await expect(apiClient.get(API_ROUTES.AUTH.ME)).rejects.toMatchObject({ status: 401 });
+    await expect(apiClient.get(AuthRoutes.ME)).rejects.toMatchObject({ status: 401 });
 
     expect(refreshCallCount).toBe(1);
     expect(useAuthStore.getState().user).toBeNull();
@@ -117,10 +117,10 @@ describe('apiClient', () => {
     useAuthStore.setState({ accessToken: null, refreshToken: 'some-refresh-token' });
     let refreshCallCount = 0;
     server.use(
-      http.post(API_ROUTES.AUTH.LOGIN, () =>
+      http.post(AuthRoutes.LOGIN, () =>
         HttpResponse.json({ message: 'Invalid credentials.' }, { status: 401 })
       ),
-      http.post(API_ROUTES.AUTH.REFRESH_TOKEN, () => {
+      http.post(AuthRoutes.REFRESH_TOKEN, () => {
         refreshCallCount += 1;
         return envelope({
           accessToken: 'x',
@@ -132,7 +132,7 @@ describe('apiClient', () => {
     );
 
     await expect(
-      apiClient.post(API_ROUTES.AUTH.LOGIN, { email: 'ada@example.com', password: 'wrong' })
+      apiClient.post(AuthRoutes.LOGIN, { email: 'ada@example.com', password: 'wrong' })
     ).rejects.toMatchObject({ status: 401, message: 'Invalid credentials.' });
 
     expect(refreshCallCount).toBe(0);

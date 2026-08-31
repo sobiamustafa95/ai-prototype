@@ -39,9 +39,10 @@ export const otpSchema = z.object({
 export type OtpValues = z.infer<typeof otpSchema>;
 
 /**
- * The backend resolves the account from the reset token itself (see
- * docs/fe-api-guide.md: "There is no `email` field on `verify-reset-password`")
- * — the token is carried through route state/search params, not this schema.
+ * The backend resolves the account from the reset token itself — there is no
+ * `email` field on `verify-reset-password` (see `authService.verifyResetPassword`'s
+ * own payload shape) — the token is carried through route state/search params,
+ * not this schema.
  */
 export const resetPasswordSchema = z
   .object({

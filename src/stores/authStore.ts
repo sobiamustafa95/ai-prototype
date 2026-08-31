@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AuthTokens, AuthUser } from 'src/types';
-import { authService } from 'src/services/authService';
+import type { AuthTokens, AuthUser } from 'src/types/auth';
+import { authService } from 'src/services/auth/authService';
 import { queryClient } from 'src/services/queryClient';
 import { CONFIG } from 'src/constants/config';
 
@@ -9,11 +9,8 @@ interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
   refreshToken: string | null;
-  status: 'idle' | 'authenticating' | 'authenticated' | 'error';
-  error: string | null;
   /** False until zustand/persist has finished reading localStorage (see guards.tsx). */
   hasHydrated: boolean;
-  login: (credentials: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   logoutAllDevices: () => Promise<void>;
   /** Internal — used by src/services/api-client.ts to persist a rotated token pair. */
@@ -29,7 +26,6 @@ function clearSession(): void {
     user: null,
     accessToken: null,
     refreshToken: null,
-    status: 'idle',
   });
   // authStore -> queryClient -> api-client -> authStore is a safe cycle here: every
   // read/call happens inside a callback (never at module-eval time), matching the
@@ -49,26 +45,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       refreshToken: null,
-      status: 'idle',
-      error: null,
       hasHydrated: false,
-      async login(credentials) {
-        set({ status: 'authenticating', error: null });
-        try {
-          const { user, tokens } = await authService.login(credentials);
-          set({
-            user,
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-            status: 'authenticated',
-          });
-        } catch (error) {
-          set({
-            status: 'error',
-            error: error instanceof Error ? error.message : 'Login failed',
-          });
-        }
-      },
       async logout() {
         await authService.logout().catch(() => {});
         clearSession();
@@ -85,8 +62,6 @@ export const useAuthStore = create<AuthState>()(
           user,
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
-          status: 'authenticated',
-          error: null,
         });
       },
       setHasHydrated(value) {

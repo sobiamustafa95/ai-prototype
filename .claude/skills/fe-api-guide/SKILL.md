@@ -15,11 +15,22 @@ An OpenAPI/Swagger file, a Postman collection, or a written endpoint list.
 
 1. **`docs/api/README.md`** — every endpoint: method, path, auth, params, request/response
    shapes, and error cases, grouped by service area.
-2. **Suggested `src/constants/api-routes.ts` entries** — grouped route objects (functions for
-   path params), matching the existing shape. Do not overwrite unrelated groups.
-3. **Suggested `src/schemas/*.schema.ts`** — Zod schemas for each request/response, with
+2. **Suggested `src/constants/api-routes.ts` entries** — one flat, per-concern TS `enum`
+   (e.g. `OrderRoutes`), matching the existing shape (`AuthRoutes`/`ExampleRoutes` in that
+   same file) — see `AGENTS.md` § Constant Registries. A real `enum` can't nest, so a new
+   service area is its own enum, never a new key nested inside an existing one. A route
+   needing a path param stays a plain string member for its static base path (enum members
+   can only be string/numeric literals, never functions) — interpolate the param at the call
+   site (e.g. `` `${OrderRoutes.DETAIL}/${id}` ``), or add a small colocated helper function
+   exported alongside the enum if more than one call site needs the same interpolation. Do
+   not overwrite unrelated enums.
+3. **Suggested `src/constants/queryKeys.ts` entries** — new members on the global `QueryKey`
+   enum for every list/detail endpoint this integration adds a TanStack Query hook for (see
+   `AGENTS.md` § Data & State) — never a per-feature key factory, never an inline string
+   literal in the hook itself.
+4. **Suggested `src/schemas/*.schema.ts`** — Zod schemas for each request/response, with
    inferred TypeScript types, so the query layer can validate payloads at the boundary.
-4. **Per-service README** for each major area.
+5. **Per-service README** for each major area.
 
 ## Rules
 

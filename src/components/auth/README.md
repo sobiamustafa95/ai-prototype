@@ -11,8 +11,9 @@ them). The **pages** that route to them — layout glue, `Seo`, reading
 ## What it does
 
 - `LoginForm` (page: `src/pages/auth/LoginPage.tsx`) — email + password, goes through
-  `authStore.login`. On success, navigates to `location.state.from` (where
-  `RoleGuards`/`AuthenticatedRoute` sent the user from) or their role's home route.
+  `useLogin` (`src/hooks/auth/useAuth.ts`). On success, navigates to
+  `location.state.from` (where `RoleGuards`/`AuthenticatedRoute` sent the user from) or
+  their role's home route.
 - `SignupForm` (page: `SignupPage.tsx`) — name + email + phone + password + confirm,
   creates the account then redirects to `/verify-signup-otp` with the email in router
   state.
@@ -21,8 +22,10 @@ them). The **pages** that route to them — layout glue, `Seo`, reading
 - `OtpForm` (pages: `VerifySignupOtpPage.tsx` and `VerifyForgotPasswordOtpPage.tsx`) —
   generic 6-digit code form; the two pages give it different `onVerify`/`onResend`
   callbacks against different endpoints:
-  - Signup verify → activates the account and starts a session
-    (`authStore.setSession`) → `/dashboard`.
+  - Signup verify → activates the account and starts a session (`useVerifyOtp`'s own
+    `onSuccess` calls `authStore.setSession`) → `getHomeRouteForRole(user.role)`
+    (`src/routes/ProtectedRoutes.tsx`) — the signed-in user's own role's home route
+    (e.g. `/member/dashboard`, `/admin/dashboard`), not a literal `/dashboard`.
   - Forgot-password verify → returns a single-use reset token → `/reset-password`
     with the token in router state.
   - Both pages redirect back to where the flow starts if hit directly with no email
@@ -35,9 +38,16 @@ them). The **pages** that route to them — layout glue, `Seo`, reading
 
 ## State approach
 
-- **Server state:** TanStack Query `useMutation` for signup/OTP/forgot/reset (one-off
-  actions, not persisted state). Login/logout stay on `authStore` directly since that
-  already represents persisted session state.
+- **Server state:** every mutation — including login/logout — goes through a named
+  TanStack Query hook in `src/hooks/auth/useAuth.ts` (`useLogin`, `useSignup`,
+  `useLogout`, `useForgotPassword`, `useResetPassword`, `useVerifyOtp`, plus
+  `useResendSignupOtp`/`useVerifyForgotPasswordOtp` for the forgot-password OTP flow) —
+  never an inline `useMutation` in a form component. `useLogin`/`useLogout` don't call
+  `authService` directly like the others do: `authStore` must stay the single source of
+  truth for session state, since `api-client.ts`'s response interceptor calls
+  `useAuthStore.getState().logout()` from outside React on a failed token refresh, and a
+  hook can never be called from there. See that file's own doc comment for the full
+  reasoning.
 - **Client/session state:** `src/stores/authStore.ts` (`persist`-backed) —
   `accessToken`, `refreshToken`, and `user` are the single source of truth;
   `api-client.ts` reads/writes them directly, never via a component or
@@ -48,8 +58,10 @@ them). The **pages** that route to them — layout glue, `Seo`, reading
 ## API dependency
 
 `src/constants/api-routes.ts` § `AUTH` mirrors the real backend's `/auth/*` paths;
-`src/services/authService.ts` has one typed method per endpoint. `src/mocks/handlers.ts`
-mocks the same envelope/shapes for `npm run dev` with no real backend running.
+`src/services/auth/authService.ts` has one typed method per endpoint, called only from
+`src/hooks/auth/useAuth.ts` (never straight from a form/page) and from `api-client.ts`'s
+own refresh-token handling. `src/mocks/handlers.ts` mocks the same envelope/shapes for
+`npm run dev` with no real backend running.
 
 Four endpoints are fully implemented in `authService` but have **no page** here —
 `changePassword`, `logoutAllDevices`, `activeSessions`, and `appleCallback` — since a
@@ -74,6 +86,6 @@ backend's 15-minute access token / 60-day rotating refresh token:
   back — never just the access token, since replaying a spent refresh token trips the
   backend's stolen-token detection and logs the user out everywhere. A failed refresh,
   or a second 401 after retrying, ends the session the same way a manual logout does.
-- **Cross-tab:** `src/hooks/useSyncAuthAcrossTabs.ts` listens for the persisted auth
+- **Cross-tab:** `src/hooks/common/useSyncAuthAcrossTabs.ts` listens for the persisted auth
   key changing in another tab (e.g. that tab logging out) and re-syncs this tab's
   state instead of leaving it showing a stale session.

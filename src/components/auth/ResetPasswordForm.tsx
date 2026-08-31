@@ -1,11 +1,10 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PasswordInput } from 'src/components/common/PasswordInput';
 import { Button } from 'src/components/common/Button';
-import { authService } from 'src/services/authService';
+import { useResetPassword } from 'src/hooks/auth/useAuth';
 import { toast } from 'src/stores/toastStore';
 import { resetPasswordSchema, type ResetPasswordValues } from 'src/schemas/auth.schema';
 
@@ -23,24 +22,23 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     formState: { errors },
   } = useForm<ResetPasswordValues>({ resolver: zodResolver(resetPasswordSchema) });
 
-  const resetPassword = useMutation({
-    mutationFn: (values: ResetPasswordValues) =>
-      authService.verifyResetPassword({ token, password: values.password }),
-    meta: { skipErrorToast: true },
-    onSuccess: () => {
-      toast.success(t('SUCCESS'));
-      void navigate('/login', { replace: true });
-    },
-  });
+  const resetPassword = useResetPassword();
 
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        // .catch(() => {}) — the global onError already handles the error;
-        // without it a rejected mutateAsync is an unhandled promise rejection
-        // (AGENTS.md § Data & State).
-        void handleSubmit((values) => resetPassword.mutateAsync(values).catch(() => {}))(event);
+        void handleSubmit((values) => {
+          resetPassword.mutate(
+            { token, password: values.password },
+            {
+              onSuccess: () => {
+                toast.success(t('SUCCESS'));
+                void navigate('/login', { replace: true });
+              },
+            }
+          );
+        })(event);
       }}
       noValidate
     >

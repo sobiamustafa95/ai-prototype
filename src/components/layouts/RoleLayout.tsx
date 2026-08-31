@@ -1,9 +1,16 @@
+import type { ReactNode } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from 'src/components/common/Button';
 import { ThemeToggle } from 'src/components/common/ThemeToggle';
 import { useAuthStore } from 'src/stores/authStore';
-import { getNavItemsForRole, getRoleLayout, type NavItem } from 'src/routes/ProtectedRoutes';
+import { useLogout } from 'src/hooks/auth/useAuth';
+import {
+  getNavItemsForRole,
+  getRoleLayout,
+  type NavItem,
+  type RoleLayoutVariant,
+} from 'src/routes/ProtectedRoutes';
 import type { TranslationKey } from 'src/i18n';
 
 interface SidebarShellProps {
@@ -15,7 +22,7 @@ interface SidebarShellProps {
 function SidebarShell({ titleKey, navItems }: SidebarShellProps) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
+  const logout = useLogout();
   const { t } = useTranslation();
 
   return (
@@ -57,7 +64,11 @@ function SidebarShell({ titleKey, navItems }: SidebarShellProps) {
             variant="ghost"
             size="sm"
             onClick={() => {
-              void logout().then(() => navigate('/login', { replace: true }));
+              logout.mutate(undefined, {
+                onSuccess: () => {
+                  void navigate('/login', { replace: true });
+                },
+              });
             }}
           >
             {t('NAV_SIGN_OUT')}
@@ -72,22 +83,36 @@ function SidebarShell({ titleKey, navItems }: SidebarShellProps) {
 }
 
 /**
+ * One entry per `RoleLayoutVariant` — a real TypeScript `Record`, same
+ * exhaustiveness mechanism `ProtectedRoutes.tsx`'s own `ROLE_LAYOUT: Record<Role,
+ * RoleLayoutConfig>` already relies on: if `RoleLayoutVariant` ever gains a
+ * second member without a matching entry here, this object literal is a
+ * compile-time `tsc -b` error, not a silently-wrong render. A `switch`/`case`
+ * over a currently-single-member union would trip
+ * `@typescript-eslint/no-unnecessary-condition` (the `'sidebar'` comparison is
+ * genuinely always-true today) — this sidesteps that without weakening the
+ * guarantee, since a `Record` doesn't need a runtime comparison to be exhaustive.
+ */
+const SHELL_BY_VARIANT: Record<RoleLayoutVariant, (props: SidebarShellProps) => ReactNode> = {
+  sidebar: SidebarShell,
+};
+
+/**
  * Renders the right shell for the current user's role — reads
  * `src/routes/ProtectedRoutes.tsx`'s `getRoleLayout(role)` for which `variant`
  * to use and `getNavItemsForRole(role)` for its nav items (own + common
  * routes), so two roles sharing a `variant` (both example roles do today) get
  * the identical shell for free, and a role that needs a visually different
- * area just needs a new `variant` value + a case here — no router or guard
- * code changes. Wired into `AppRouters.tsx`'s protected route group, where
- * `RoleGuards` guarantees `user` exists by the time this renders.
+ * area just needs a new `variant` value + an entry in `SHELL_BY_VARIANT` above
+ * — no router or guard code changes. Wired into `AppRouters.tsx`'s protected
+ * route group, where `RoleGuards` guarantees `user` exists by the time this
+ * renders.
  */
 export function RoleLayout() {
   const role = useAuthStore((state) => state.user?.role);
   const layout = getRoleLayout(role);
   const navItems = getNavItemsForRole(role);
 
-  // `layout.variant` is only ever 'sidebar' today (see RoleLayoutVariant), so
-  // there's nothing to branch on yet — reintroduce a switch here once a second
-  // variant exists, matching this function's own doc comment above.
-  return <SidebarShell titleKey={layout.titleKey} navItems={navItems} />;
+  const Shell = SHELL_BY_VARIANT[layout.variant];
+  return <Shell titleKey={layout.titleKey} navItems={navItems} />;
 }

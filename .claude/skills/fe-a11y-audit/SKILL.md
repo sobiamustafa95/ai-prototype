@@ -9,7 +9,7 @@ Authoritative checklist: `AGENTS.md` § Accessibility.
 
 ## Procedure
 
-1. **Static pass:** `npx eslint --config eslint.a11y.config.js <path>` (strict jsx-a11y).
+1. **Static pass:** `pnpm exec eslint --config eslint.a11y.config.js <path>` (strict jsx-a11y).
 2. **Manual pass:** read the markup against the checklist below — this boilerplate has no
    automated a11y test framework, so this is where real judgment (labeling, focus order,
    keyboard reachability) has to happen.

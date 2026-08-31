@@ -47,6 +47,68 @@ const impeccable = {
   },
 };
 
+/**
+ * Local plugin enforcing the role system's own folder-privacy rule: `src/components/<role>/`
+ * is scoped to that role's own pages/components (AGENTS.md § Directory Map — "Components
+ * scoped to one role's own pages... add at this level, mirrored by src/pages/<role>/").
+ * Nothing outside `src/components/<role>/**` or `src/pages/<role>/**` may import from it.
+ *
+ * Deliberately generic instead of a per-role hardcoded list: it only excludes the small,
+ * stable set of documented non-role "concern" folders under src/components/ (AGENTS.md rule
+ * #1's own zero-lock-in exception list — common/auth/example/layouts) and treats every other
+ * `src/components/<X>/` as role-private. This means adding a new role never touches this
+ * file — AGENTS.md's own promise that adding a role "touches exactly three places" (roles.ts,
+ * ProtectedRoutes.tsx, src/pages/<role>/) stays true; a hardcoded per-role allowlist here
+ * would have silently added an undocumented fourth place to keep in sync.
+ */
+const roleBoundaries = {
+  rules: {
+    'no-cross-role-component-import': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description:
+            "Disallow importing from src/components/<role>/ outside that role's own components/pages.",
+        },
+        schema: [],
+        messages: {
+          crossRole:
+            'Cannot import from "src/components/{{role}}/" here — that folder is private to the {{role}} role (only src/components/{{role}}/** and src/pages/{{role}}/** may import from it). See AGENTS.md § Directory Map.',
+        },
+      },
+      create(context) {
+        // Documented, stable non-role folders under src/components/ (AGENTS.md rule #1) —
+        // never role-private, and this list doesn't grow when a role is added.
+        const CONCERN_FOLDERS = new Set(['common', 'auth', 'example', 'layouts']);
+        const IMPORT_SOURCE = /(?:^|\/)src\/components\/([^/]+)\//;
+        const filename = context.filename.replace(/\\/g, '/');
+
+        function checkSource(node, source) {
+          if (typeof source !== 'string') return;
+          const match = IMPORT_SOURCE.exec(source);
+          if (!match) return;
+          const role = match[1];
+          if (CONCERN_FOLDERS.has(role)) return;
+          const ownedByRole =
+            filename.includes(`/src/components/${role}/`) ||
+            filename.includes(`/src/pages/${role}/`);
+          if (ownedByRole) return;
+          context.report({ node, messageId: 'crossRole', data: { role } });
+        }
+
+        return {
+          ImportDeclaration(node) {
+            checkSource(node, node.source.value);
+          },
+          ImportExpression(node) {
+            if (node.source.type === 'Literal') checkSource(node, node.source.value);
+          },
+        };
+      },
+    },
+  },
+};
+
 export default tseslint.config(
   // A flat-config object only acts as a true *global* ignore when `ignores`
   // is its sole key — bundled with `linterOptions` (below) it silently
@@ -188,7 +250,10 @@ export default tseslint.config(
       ],
       // React Router's documented 404 pattern is `throw new Response(...)` from a
       // loader (isRouteErrorResponse checks for that exact shape, not `instanceof Error`).
-      '@typescript-eslint/only-throw-error': ['error', { allow: [{ from: 'lib', name: 'Response' }] }],
+      '@typescript-eslint/only-throw-error': [
+        'error',
+        { allow: [{ from: 'lib', name: 'Response' }] },
+      ],
       // strictTypeChecked's default bans every non-string type in a template
       // expression, including numbers — but `${count}` always stringifies to a
       // sensible, unambiguous value (unlike objects/any/nullish, which stay banned).
@@ -209,6 +274,17 @@ export default tseslint.config(
     },
   },
 
+  // Role-folder privacy (AGENTS.md § Directory Map) — scoped to src/ only, since the
+  // violation this guards against (importing a role's private component from outside
+  // that role) can only ever originate from app source, never test/tooling files.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { roleBoundaries },
+    rules: {
+      'roleBoundaries/no-cross-role-component-import': 'error',
+    },
+  },
+
   // Fast-refresh correctness is only meaningful for component modules.
   {
     files: ['src/components/**/*.tsx'],
@@ -221,13 +297,19 @@ export default tseslint.config(
   {
     files: ['**/*.d.ts'],
     rules: {
-      '@typescript-eslint/no-empty-object-type': ['error', { allowInterfaces: 'with-single-extends' }],
+      '@typescript-eslint/no-empty-object-type': [
+        'error',
+        { allowInterfaces: 'with-single-extends' },
+      ],
     },
   },
 
-  // Hardcoded user-facing text is only enforced inside rendered components.
+  // Hardcoded user-facing text is enforced inside rendered components AND the page
+  // wrappers that embed them — a literal typed directly into a `<Name>Page.tsx` route
+  // wrapper is exactly as much a violation of AGENTS.md's "no hardcoded strings" rule
+  // as one inside the feature component it renders.
   {
-    files: ['src/components/**/*.tsx'],
+    files: ['src/components/**/*.tsx', 'src/pages/**/*.tsx'],
     rules: {
       'react/jsx-no-literals': [
         'error',

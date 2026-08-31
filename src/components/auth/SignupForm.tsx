@@ -1,12 +1,11 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Input } from 'src/components/common/Input';
 import { PasswordInput } from 'src/components/common/PasswordInput';
 import { Button } from 'src/components/common/Button';
-import { authService } from 'src/services/authService';
+import { useSignup } from 'src/hooks/auth/useAuth';
 import { signupSchema, type SignupValues } from 'src/schemas/auth.schema';
 
 export function SignupForm() {
@@ -18,24 +17,19 @@ export function SignupForm() {
     formState: { errors },
   } = useForm<SignupValues>({ resolver: zodResolver(signupSchema) });
 
-  const signup = useMutation({
-    mutationFn: (values: SignupValues) => authService.signup(values),
-    // The form shows the error inline; skip the global toast for this one.
-    meta: { skipErrorToast: true },
-    onSuccess: (_data, variables) => {
-      void navigate('/verify-signup-otp', { state: { email: variables.email } });
-    },
-  });
+  const signup = useSignup();
 
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        // .catch(() => {}) — the global onError (queryClient.ts) already
-        // handles/would-toast the error; signup.isError below renders it
-        // inline. Without this, a rejected mutateAsync surfaces as an
-        // unhandled promise rejection (AGENTS.md § Data & State).
-        void handleSubmit((values) => signup.mutateAsync(values).catch(() => {}))(event);
+        void handleSubmit((values) => {
+          signup.mutate(values, {
+            onSuccess: (_data, variables) => {
+              void navigate('/verify-signup-otp', { state: { email: variables.email } });
+            },
+          });
+        })(event);
       }}
       noValidate
     >

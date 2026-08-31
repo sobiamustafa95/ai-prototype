@@ -29,21 +29,23 @@ lint-staged + commitlint. See `AGENTS.md` § Testing for what to test and what t
 ## Project layout
 
 ```
-src/components/{common,features,layouts}   utils/ hooks/ services/ stores/
-src/{schemas,types,constants,router,mocks,i18n}
+src/components/{common,auth,example,layouts,<role>}   src/pages/{common,auth,<role>}
+src/hooks/<concern>/   src/services/<concern>/   src/types/<concern>/   (concern = common/
+  auth/ or a role name — api-client.ts/queryClient.ts stay at services/ root, see AGENTS.md)
+utils/ stores/ schemas/ constants/ routes/ mocks/ i18n/
 scripts/hooks/pre-commit.mjs   scripts/sync-ai-config.mjs
 AGENTS.md  CLAUDE.md  .cursor/{rules,commands}  .claude/{commands,skills}
-docs/{onboarding.md,quality-gate/}  .github/workflows/
+docs/{GUIDE.md,onboarding.md}  .github/workflows/
 ```
 
 See `AGENTS.md` § Directory Map for what belongs where.
 
 ## The quality gate (blocks the commit)
 
-`pnpm verify` is the single canonical check — 15 checks (guard rails, static-analysis contract,
-AI-command sync, lint-config-contract, a hardening-features contract, types, tests, lint, a11y,
-format, style, React Doctor, build, a bundle-size budget, and a Playwright browser smoke-gate),
-each its own `check:*`/`ai:check`/
+`pnpm verify` is the single canonical check — 16 checks (guard rails, static-analysis contract,
+AI-command sync, lint-config-contract, a hardening-features contract, i18n-key parity, types,
+tests, lint, a11y, format, style, React Doctor, build, a bundle-size budget, and a Playwright
+browser smoke-gate), each its own `check:*`/`ai:check`/
 `static-analysis:contract` script, always full-repo and non-mutating. CI runs a handful of the
 cheaper checks as their own named steps first (for a readable status line), then runs the full
 `pnpm verify` — the canonical rule set still lives in one place, not hand-duplicated into the
@@ -60,9 +62,9 @@ commands are safe to run blind.
 | Script                           | Does                                                                                                            |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `pnpm dev` / `build` / `preview` | Vite dev / prod build / preview                                                                                 |
-| `pnpm verify`                    | **The** canonical gate — all 15 checks, full-repo                                                               |
+| `pnpm verify`                    | **The** canonical gate — all 16 checks, full-repo                                                               |
 | `pnpm gate`                      | Run most of the same checks scoped to staged files (pre-commit) — not `check:test`/`check:e2e`, see `AGENTS.md` |
-| `pnpm check:<name>`              | Run one check standalone — see `AGENTS.md` for the list of 15                                                   |
+| `pnpm check:<name>`              | Run one check standalone — see `AGENTS.md` for the list of 16                                                   |
 | `pnpm test` / `test:run`         | Vitest watch mode / single run (`test:run` is what `check:test` runs)                                           |
 | `pnpm test:e2e:headed`           | Playwright, whole suite, visible browser — local visual debugging (not required by the gate)                    |
 | `pnpm test:e2e:changed`          | Playwright, `--only-changed`, visible browser — advanced; only tracks `e2e/` files, not `src/`, see `AGENTS.md` |

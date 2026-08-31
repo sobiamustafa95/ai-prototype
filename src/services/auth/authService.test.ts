@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { server } from 'src/mocks/server';
-import { API_ROUTES } from 'src/constants/api-routes';
+import { AuthRoutes } from 'src/constants/api-routes';
 import { authService } from './authService';
 
 function envelope(data: unknown) {
@@ -9,14 +9,14 @@ function envelope(data: unknown) {
 
 /**
  * Standalone tests confirming each `authService` method hits the right
- * `API_ROUTES.AUTH` endpoint with the right method/payload shape — reusable
+ * `AuthRoutes` endpoint with the right method/payload shape — reusable
  * logic other features depend on, tested in isolation from any one workflow.
  */
 describe('authService', () => {
   it('posts signup with the name/email/phone/password payload', async () => {
     let received: unknown;
     server.use(
-      http.post(API_ROUTES.AUTH.SIGNUP, async ({ request }) => {
+      http.post(AuthRoutes.SIGNUP, async ({ request }) => {
         received = await request.json();
         return envelope(true);
       })
@@ -40,7 +40,7 @@ describe('authService', () => {
   it('posts login with email/password and returns the session', async () => {
     let received: unknown;
     server.use(
-      http.post(API_ROUTES.AUTH.LOGIN, async ({ request }) => {
+      http.post(AuthRoutes.LOGIN, async ({ request }) => {
         received = await request.json();
         return envelope({
           user: {
@@ -71,7 +71,7 @@ describe('authService', () => {
     let received: unknown;
     let method = '';
     server.use(
-      http.post(API_ROUTES.AUTH.REFRESH_TOKEN, async ({ request }) => {
+      http.post(AuthRoutes.REFRESH_TOKEN, async ({ request }) => {
         method = request.method;
         received = await request.json();
         return envelope({
@@ -93,7 +93,7 @@ describe('authService', () => {
   it('gets the authenticated user via GET', async () => {
     let method = '';
     server.use(
-      http.get(API_ROUTES.AUTH.ME, ({ request }) => {
+      http.get(AuthRoutes.ME, ({ request }) => {
         method = request.method;
         return envelope({
           _id: '1',
@@ -114,7 +114,7 @@ describe('authService', () => {
   it('posts logout with no body', async () => {
     let called = false;
     server.use(
-      http.post(API_ROUTES.AUTH.LOGOUT, () => {
+      http.post(AuthRoutes.LOGOUT, () => {
         called = true;
         return new HttpResponse(null, { status: 204 });
       })

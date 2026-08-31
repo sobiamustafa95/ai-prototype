@@ -1,6 +1,6 @@
 import { lazy, type ComponentType } from 'react';
 import type { TranslationKey } from 'src/i18n';
-import { ROLES, type Role } from 'src/routes/roles';
+import { Role } from 'src/routes/roles';
 
 /**
  * The single registry of every protected page: which roles may reach it, and
@@ -14,8 +14,8 @@ import { ROLES, type Role } from 'src/routes/roles';
  * profile/notifications).
  *
  * Adding a role end-to-end touches exactly three places, in this order:
- * 1. `src/routes/roles.ts` — add the `ROLES` key.
- * 2. This file — add that role's own routes (`roles: [ROLES.X]`, each with
+ * 1. `src/routes/roles.ts` — add the `Role` member.
+ * 2. This file — add that role's own routes (`roles: [Role.X]`, each with
  *    `nav: { labelKey, end? }` if it should show in the sidebar), and its
  *    entry in `ROLE_LAYOUT` below (reuse `variant: 'sidebar'` unless it needs
  *    a visually different shell — see `RoleLayoutVariant`).
@@ -58,22 +58,22 @@ const SettingsPage = lazy(() =>
   import('src/pages/common/SettingsPage').then((m) => ({ default: m.SettingsPage }))
 );
 
-/** `ROLES.MEMBER`'s own routes. */
+/** `Role.MEMBER`'s own routes. */
 export const MEMBER_PROTECTED_ROUTES: readonly ProtectedRoute[] = [
   {
     path: '/member/dashboard',
     Component: MemberDashboardPage,
-    roles: [ROLES.MEMBER],
+    roles: [Role.MEMBER],
     nav: { labelKey: 'NAV_DASHBOARD', end: true },
   },
 ];
 
-/** `ROLES.ADMIN`'s own routes. */
+/** `Role.ADMIN`'s own routes. */
 export const ADMIN_PROTECTED_ROUTES: readonly ProtectedRoute[] = [
   {
     path: '/admin/dashboard',
     Component: AdminDashboardPage,
-    roles: [ROLES.ADMIN],
+    roles: [Role.ADMIN],
     nav: { labelKey: 'NAV_ADMIN_DASHBOARD', end: true },
   },
 ];
@@ -102,7 +102,10 @@ export const PROTECTED_ROUTES: readonly ProtectedRoute[] = [
 ];
 
 function isRouteAllowedForRole(role: string, route: ProtectedRoute): boolean {
-  return route.roles === 'all' || route.roles.some((allowed) => allowed === role);
+  // `role` is an unvalidated string from the backend/auth store (see AuthUser.role
+  // in src/types/index.ts) — the cast mirrors `isRole` below, comparing it against
+  // the closed `Role` set without widening `route.roles`' own element type to `string`.
+  return route.roles === 'all' || route.roles.some((allowed) => allowed === (role as Role));
 }
 
 function hasNav(
@@ -130,6 +133,10 @@ export function getNavItemsForRole(role: string | undefined): NavItem[] {
 
 const DEFAULT_HOME_ROUTE = '/login';
 
+function findHomeRoute(role: string): ProtectedRoute | undefined {
+  return PROTECTED_ROUTES.filter(hasNav).find((route) => isRouteAllowedForRole(role, route));
+}
+
 /**
  * Where a role lands after login/verify, or when `AuthRedirectRoute` bounces an
  * already-authenticated user off `/login` — the first nav-eligible route
@@ -139,8 +146,18 @@ const DEFAULT_HOME_ROUTE = '/login';
  */
 export function getHomeRouteForRole(role: string | undefined): string {
   if (!role) return DEFAULT_HOME_ROUTE;
-  const home = PROTECTED_ROUTES.filter(hasNav).find((route) => isRouteAllowedForRole(role, route));
-  return home?.path ?? DEFAULT_HOME_ROUTE;
+  return findHomeRoute(role)?.path ?? DEFAULT_HOME_ROUTE;
+}
+
+/**
+ * Whether `role` actually has a nav-eligible route registered — lets a caller
+ * (`src/routes/HomeRedirectRoute.tsx`) distinguish "genuinely nothing configured
+ * for this role yet" from `getHomeRouteForRole`'s own `DEFAULT_HOME_ROUTE`
+ * fallback, which exists for the "no role at all" (unauthenticated) case, not
+ * as a signal that a signed-in role is unconfigured.
+ */
+export function hasHomeRouteForRole(role: string | undefined): boolean {
+  return role !== undefined && findHomeRoute(role) !== undefined;
 }
 
 export type RoleLayoutVariant = 'sidebar';
@@ -158,14 +175,14 @@ export interface RoleLayoutConfig {
 }
 
 const ROLE_LAYOUT: Record<Role, RoleLayoutConfig> = {
-  [ROLES.MEMBER]: { variant: 'sidebar', titleKey: 'PORTAL_MEMBER_TITLE' },
-  [ROLES.ADMIN]: { variant: 'sidebar', titleKey: 'PORTAL_ADMIN_TITLE' },
+  [Role.MEMBER]: { variant: 'sidebar', titleKey: 'PORTAL_MEMBER_TITLE' },
+  [Role.ADMIN]: { variant: 'sidebar', titleKey: 'PORTAL_ADMIN_TITLE' },
 };
 
 const DEFAULT_ROLE_LAYOUT: RoleLayoutConfig = { variant: 'sidebar', titleKey: 'APP_NAME' };
 
 function isRole(value: string): value is Role {
-  return Object.values(ROLES).includes(value as Role);
+  return Object.values(Role).includes(value as Role);
 }
 
 export function getRoleLayout(role: string | undefined): RoleLayoutConfig {
