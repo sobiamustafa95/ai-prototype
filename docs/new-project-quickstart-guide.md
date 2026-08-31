@@ -36,7 +36,16 @@ Do these roughly in this order — each step makes the next one meaningfully eas
    already reads tokens, so this alone re-skins the whole app.
 4. **Wire up the real `/auth` backend** — the login/signup/OTP/reset flow already exists and
    works end-to-end against mocks; use the `fe-api-guide` skill against your real OpenAPI spec
-   to generate the route constants/schemas, then point `VITE_API_BASE_URL` at the real API.
+   to generate the route constants/schemas. This is also the point where you'd set up your
+   real env — skippable entirely until you get here:
+   ```bash
+   cp .env.example .env.local
+   ```
+   - `VITE_API_BASE_URL` — leave empty for MSW-mocked, same-origin dev (the default); set it
+     to your real API host once you're actually wiring up the backend.
+   - `VITE_ENABLE_MOCKS` — `true` by default, keeps the app fully runnable with zero backend.
+     Every var is Zod-validated at module load (`src/constants/env.ts`) — a missing/malformed
+     value fails loudly at startup instead of shipping a silent misconfiguration.
 5. **Set up your real roles/portals** — the boilerplate ships two example roles (`MEMBER`,
    `ADMIN`) as placeholders. Rename/add roles via the documented 3-step process in
    `AGENTS.md` (`roles.ts` → `ProtectedRoutes.tsx` → `pages/<role>/`) — no skill for this one,
@@ -80,6 +89,17 @@ you. (Full detail lives in `AGENTS.md` — this is the checklist, not the rulebo
   (load → interact → success/error) through the actual components and MSW-backed network
   layer — it does not unit-test `Button`/`Input`/`Dialog` in isolation. The workflow test is
   part of what you copy, not a follow-up step.
+- ✅ **Adding a new API route or query key follows the same registry pattern as roles.** A new
+  endpoint is a member on the relevant enum in `src/constants/api-routes.ts` (e.g.
+  `AuthRoutes`, `ExampleRoutes` — a new route _group_ gets its own enum, since a real `enum`
+  can't nest). A new cached query is a member on `QueryKey` in `src/constants/queryKeys.ts`,
+  referenced directly in the feature's query hook (`queryKey: [QueryKey.YOUR_KEY, params]`) —
+  never an inline string literal, never a per-feature key factory.
+- ✅ **Adding a new language** is copy-translate-register, nothing more: copy
+  `src/i18n/locales/en/common.json` to `locales/<lng>/common.json`, translate every value
+  (keep the keys identical), then add it to the `resources` object in `src/i18n/index.ts`.
+  `check:i18n` (one of the 16 gate checks) enforces every locale's key set matches `en`
+  exactly — there's no escape hatch, so do this the same way every time.
 
 ---
 
@@ -99,6 +119,20 @@ you. (Full detail lives in `AGENTS.md` — this is the checklist, not the rulebo
 - ❌ **Don't invent a business-domain concept in the boilerplate layer.** If you're extending
   the shared boilerplate itself (not your own project repo), keep it domain-agnostic — real
   features belong in your project, not upstream.
+- ❌ **Don't import across roles.** `components/admin/` can never import from
+  `components/member/` (or vice versa) — lint-enforced
+  (`roleBoundaries/no-cross-role-component-import`). Only `common/` is universal; see the
+  architecture guide for the full explanation.
+- ❌ **Don't write a commit message the hook will reject.** Commitlint enforces Conventional
+  Commits: `<type>(<scope>): <subject>` — types are `feat fix refactor perf test docs style
+build ci chore`; subject starts lower-case, no trailing period, ≤72 characters. Example:
+  `feat(components): add UserCard component`. This is a common first-commit surprise with zero
+  prior warning otherwise.
+- ❌ **Don't use a barrel `index.ts` re-export for components** (types may be barrel-exported,
+  components may not), **an array index as a React `key`**, **`console.log` in production
+  code** (gate dev-only logging behind `import.meta.env.DEV`), **`@ts-ignore`/
+  `@ts-expect-error`** (fix the real type instead), or **read `import.meta.env.VITE_X`
+  directly outside `src/constants/env.ts`** (add the var to that file's Zod schema instead).
 
 ---
 

@@ -159,8 +159,9 @@ own non-mutating script, always run full-repo:
 
 **Two layers, same rule set, different scope:**
 
-- **On every commit** (fast): a Husky pre-commit hook runs a 6-stage subset of these checks,
-  scoped to just your **staged files**, so it stays quick.
+- **On every commit** (fast): a Husky pre-commit hook first runs `lint-staged` (an auto-fix
+  pass — ESLint `--fix` + Prettier `--write` on your staged files), then runs a 6-stage
+  subset of the checks above, scoped to just those **staged files**, so it stays quick.
 - **On demand / in CI** (exhaustive): `pnpm verify` runs the **full 16**, full-repo — this is
   what GitHub Actions runs on every push/PR, and what a human or agent should run before
   calling any task done.
@@ -191,18 +192,50 @@ so both tools give the same answer. Each has a matching slash command as its ent
 
 ## 6. Key Architectural Decisions Worth Knowing Up Front
 
-**Workflow tests, not primitive unit tests.** This repo deliberately does not unit-test
-`Button`/`Input`/`Dialog` in isolation — they're battle-tested Radix/shadcn-pattern
-components. Every test instead exercises a real user-facing flow (load → interact →
-success/error) through the real components and real MSW-backed network layer. A primitive
-gets its coverage transitively, through every workflow that touches it.
+**Workflow tests, not primitive unit tests — three distinct test layers.** This repo
+deliberately does not unit-test `Button`/`Input`/`Dialog` in isolation — they're
+battle-tested Radix/shadcn-pattern components. Instead:
+
+- **Workflow tests** (`*.workflow.test.tsx`, co-located with the feature) exercise a real
+  user-facing flow (load → interact → success/error) through the real components and real
+  MSW-backed network layer — `ExampleWidget.workflow.test.tsx` is the reference shape. A
+  primitive gets its coverage transitively, through every workflow that touches it.
+- **Service/hook tests** (`*.test.ts`, co-located next to the file) standalone-test reusable
+  logic multiple features depend on — `authService.test.ts`, `useDebouncedValue.test.ts`.
+- **Utility tests** (`*.test.ts`, co-located next to the file) standalone-test every pure
+  function in `src/utils/` — `getPageCount.test.ts` is the reference shape.
+
+See `AGENTS.md` § Testing for the full reasoning behind each layer and what to avoid.
 
 **Auth-aware root routing.** `"/"` is never real content — it's
-`src/routes/HomeRedirectRoute.tsx`, which always redirects: a signed-in user goes straight to
-their role's home route, a signed-out user goes to `/login`. If a signed-in role genuinely has
-no home route configured yet, it shows a clear developer-facing message instead of silently
-bouncing back to the login screen — a deliberate fix for a real trap: building the auth flow
-before any role/dashboard exists used to strand a freshly-signed-up user back at `/login`.
+`src/routes/HomeRedirectRoute.tsx`, which always redirects. `/login` (and every other guest-only
+auth screen) is auth-aware too, via `AuthRedirectRoute`:
+
+| State                           | Visits `"/"`                                                                       | Visits `"/login"`                                                                              |
+| ------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Signed in                       | → straight to their role's home route (`HomeRedirectRoute`)                        | → bounced to their role's home route via `AuthRedirectRoute` — never sees the login form again |
+| Signed out                      | → `/login`                                                                         | → shows the login form normally                                                                |
+| Signed out, any protected route | → `/login` (via `AuthenticatedRoute`, which wraps the whole protected route group) | —                                                                                              |
+
+**Edge case:** if a signed-in role genuinely has no home route configured yet
+(`hasHomeRouteForRole` is `false`), `HomeRedirectRoute` shows a clear developer-facing message
+instead of silently bouncing back to `/login` — a deliberate fix for a real trap: building the
+auth flow before any role/dashboard exists used to strand a freshly-signed-up user in a
+redirect loop.
+
+**Four gating mechanisms, four distinct jobs.** Don't reach for the wrong one:
+
+| Mechanism                               | Gates                                                     | Use it for                                                                                                                          |
+| --------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `AuthenticatedRoute`                    | A whole route — auth only                                 | Wraps the entire protected route group; redirects a signed-out visitor to `/login`                                                  |
+| `AuthRedirectRoute`                     | A whole route — guest only                                | Wraps each public auth screen; bounces an already-signed-in visitor to their role's home route                                      |
+| `RoleGuards`                            | A whole route — auth **and** a specific role/set of roles | Wraps every entry in `ProtectedRoutes.tsx` — the actual route-level authorization check                                             |
+| `Can` (`src/components/common/Can.tsx`) | A fragment of an already-rendered page                    | Hide/show a piece of UI by role without gating the whole route — e.g. an admin-only button on a page every role can otherwise reach |
+
+`Can` takes `allowedRoles` + `children` (+ an optional `fallback`) and renders `children` only
+if the signed-in user's role is in the list. It's the inline complement to route-level
+guarding: reach for `RoleGuards` when an entire page should be off-limits, `Can` when only a
+fragment of an already-reachable page should be.
 
 **Two reference features, meant purely to be copied.** `components/example/` +
 `pages/common/ExamplePage.tsx` is the reference for a data-driven list/search screen with full
@@ -216,6 +249,20 @@ is the reference for a multi-page form flow. Neither is meant to be extended in 
 Comparing an enum against an untyped external string (a JWT claim, an API response) needs an
 explicit boundary cast; assigning a `Role` member _into_ a plain `string` field never does.
 
+**A role's components can never import another role's.** `components/admin/` can never
+import from `components/member/` (or vice versa) — component-to-component or
+page-to-component, in either direction. Only `common/` (and `auth/`/`example/`/`layouts/`) is
+universal. Lint-enforced (`roleBoundaries/no-cross-role-component-import`, `error`), not just
+convention:
+
+```ts
+// ❌ fails check:lint — components/member/ importing from components/admin/
+import { AdminStatCard } from 'src/components/admin/AdminStatCard';
+
+// ✅ fine — components/common/ is universal
+import { Button } from 'src/components/common/Button';
+```
+
 **Every visual value is a design token, every user-facing string is an i18n key.** No
 hardcoded hex color, arbitrary Tailwind value (`w-[127px]`), or literal string in JSX — both
 are lint-enforced, not just conventions. Re-skinning a project means editing the `@theme`
@@ -224,4 +271,16 @@ block in `src/index.css` once, never hunting through components.
 **Server state only ever goes through TanStack Query**, wrapped in a named hook under
 `hooks/<concern>/` — never a raw `useEffect` fetch, never a query called directly in a
 component. Failures toast automatically via the shared `queryClient`; a call that renders its
-own inline error opts out with `meta: { skipErrorToast: true }`.
+own inline error opts out with `meta: { skipErrorToast: true }`. A mutation that should
+invalidate a cached query (a create/update/delete against a list already on screen) follows
+one specific reference pattern — `useCreateExampleItem.ts`/`useUpdateExampleItem.ts`/
+`useDeleteExampleItem.ts` in `hooks/common/`: `toast.success(...)` then `return
+queryClient.invalidateQueries(...)`, both inside the hook's own `onSuccess`. This matters more
+than it sounds — this exact class of bug (a mutation that succeeds but never invalidates,
+leaving the UI stale) shipped 4 times in this repo's own auth forms before it was caught, which
+is what prompted adding this reference pattern in the first place.
+
+---
+
+This guide is a tour, not the rulebook. When anything here ever conflicts with `AGENTS.md`,
+`AGENTS.md` wins.
