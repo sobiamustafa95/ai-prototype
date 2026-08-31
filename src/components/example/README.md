@@ -42,9 +42,10 @@ queryClient.invalidateQueries({ queryKey: [QueryKey.EXAMPLE_LIST] })` so the
   own `editingItem` state, not one modal per row.
 - `DeleteExampleItemButton.tsx` — the delete action, built on
   `src/components/common/ConfirmDialog.tsx` (its first real caller in this repo).
-  `ConfirmDialog`'s own Cancel/Confirm buttons only call `onOpenChange?.(false)` — it
-  must be used in **controlled** mode (`open`/`onOpenChange` both passed) or neither
-  button actually closes it.
+  `ConfirmDialog`'s Cancel button closes via Radix's own `DialogClose`, so it works
+  correctly even in uncontrolled mode (neither `open`/`onOpenChange` passed); this
+  component passes both anyway, since it needs to close the dialog itself from the
+  outside once its async `onConfirm` (the delete mutation) succeeds.
 - `exampleWidgetStore.ts` — feature-scoped Zustand store for `query` / `page` UI
   state. Which modal is open is deliberately _not_ here — that's transient,
   component-local state, not worth promoting into the store.

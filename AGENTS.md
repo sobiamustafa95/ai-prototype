@@ -3,7 +3,12 @@
 **This file is the single, canonical, tool-agnostic rulebook for this repository.**
 Cursor reads it natively; `CLAUDE.md` imports it; `.cursor/rules/*.mdc` narrowly scope it.
 Never copy these rules into tool-specific files — point at this file instead.
-`docs/GUIDE.md` is the same rules as a friendlier, longer walkthrough.
+`docs/GUIDE.md` is the same rules as a friendlier, longer walkthrough. Two more standalone
+references live in `docs/`: `repo-overview-and-architecture-guide.md` (a scannable one-page
+tour of the stack, folder structure, and quality gate — for a first-time reader who wants the
+shape of the repo before diving into this file) and `new-project-quickstart-guide.md` (the
+practical, action-ordered checklist for starting a brand-new project on this boilerplate).
+Neither redefines a rule — both point back here for the authoritative detail.
 
 This is a **domain-agnostic boilerplate**, the starting point for every Geeks project.
 Two rules override everything else:

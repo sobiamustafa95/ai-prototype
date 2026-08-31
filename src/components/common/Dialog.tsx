@@ -7,7 +7,7 @@ import { cn } from 'src/lib/utils';
  * Accessible modal built on Radix's Dialog primitive — focus trap, Escape-to-close,
  * and ARIA wiring come from Radix; only tokens and layout are ours. This is the
  * reference shape for adding further complex primitives (Popover, Select, Tabs…)
- * via `npx shadcn add <component>` — see AGENTS.md § Tech Stack.
+ * via `pnpm dlx shadcn add <component>` — see AGENTS.md § Tech Stack.
  *
  * Each part is wrapped in its own named function (not a bare re-export of the Radix
  * primitive) so Fast Refresh can treat this file as component-only.

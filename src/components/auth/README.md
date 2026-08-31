@@ -61,7 +61,7 @@ them). The **pages** that route to them — layout glue, `Seo`, reading
 `src/services/auth/authService.ts` has one typed method per endpoint, called only from
 `src/hooks/auth/useAuth.ts` (never straight from a form/page) and from `api-client.ts`'s
 own refresh-token handling. `src/mocks/handlers.ts` mocks the same envelope/shapes for
-`npm run dev` with no real backend running.
+`pnpm dev` with no real backend running.
 
 Four endpoints are fully implemented in `authService` but have **no page** here —
 `changePassword`, `logoutAllDevices`, `activeSessions`, and `appleCallback` — since a
