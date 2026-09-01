@@ -120,14 +120,22 @@ src/
                   name for one specific to that role's own pages
   lib/            utils.ts — the cn() class-merge helper used by every common component
   services/<concern>/ api-client.ts and queryClient.ts stay at services/ root (cross-cutting
-                  infrastructure, not a "concern"); auth/authService.ts (real /auth
-                  contract) is the one concern folder today
+                  infrastructure, not a "concern"); every other file is one API client per
+                  concern (auth/authService.ts, common/exampleService.ts, and one such file
+                  per role/concern once it has a real endpoint) — a hook's
+                  queryFn/mutationFn always calls into one of these, never apiClient directly
   utils/          Pure helper functions (easy to unit-test)
-  schemas/        Zod schemas (form + API validation); common.schema.ts for shared primitives
+  schemas/<concern>/ Zod schemas (form + API validation), one folder per concern — same
+                  <concern> convention as everywhere else (auth/, common/ — including
+                  common.schema.ts's shared primitives — and a role's own folder once it
+                  has a real schema)
   types/<concern>/ Shared TypeScript interfaces — common/ for cross-concern types
                   (ApiResponse, Paginated), auth/ for auth-scoped types (AuthUser,
                   AuthTokens)
-  constants/      api-routes.ts, config.ts, env.ts (Zod-validated env)
+  constants/      One route-enum file per portal/concern (auth.ts, common.ts, and one
+                  per additional role/concern once it has a real endpoint) — never one
+                  flat api-routes.ts or one enum per feature; plus queryKeys.ts
+                  (global, not per-concern), config.ts, env.ts
   i18n/           i18next setup + locales/<lng>/common.json — the only source of text
   routes/         roles.ts (the Role registry) + ProtectedRoutes.tsx (every protected page,
                   its roles, its sidebar nav entry, plus getNavItemsForRole/
@@ -162,9 +170,9 @@ docs/                          This guide, onboarding, deep-dive docs
 | A whole screen/feature  | Copy `src/components/example/` + `pages/common/ExamplePage.tsx`, rename, gut it                                            |
 | Data fetching           | A TanStack Query hook under `src/hooks/<concern>/` (never a raw `useEffect` fetch, never co-located in the feature folder) |
 | UI-only state           | A Zustand store                                                                                                            |
-| A form                  | React Hook Form + a Zod schema in `src/schemas/`                                                                           |
-| User-facing text        | A key in `src/i18n/locales/<lng>/common.json`, via `t()`                                                                   |
-| An API path             | `src/constants/api-routes.ts`                                                                                              |
+| A form                  | React Hook Form + a Zod schema in `src/schemas/<concern>/`                                                                 |
+| User-facing text        | A key in `src/i18n/locales/<lng>/common.json`, via `t()` — one file per language only                                      |
+| An API path             | A member on that portal's route enum in `src/constants/<concern>.ts` (no version/host prefix)                              |
 | A pure helper           | `src/utils/`                                                                                                               |
 
 ---
@@ -246,12 +254,16 @@ hook uses: `pnpm gate`.
 
 1. Copy `src/components/example/` to a new folder, e.g. `src/components/UserProfile/`, and
    copy `src/pages/common/ExamplePage.tsx` for the matching thin route wrapper. Also copy
-   its hooks — `src/hooks/common/useExampleItems.ts` and its three mutation-hook siblings —
-   into `src/hooks/<concern>/` for your new feature (hooks live under `src/hooks/`, not the
-   component folder, so they don't come along automatically with step 1's copy).
+   its hooks and service — `src/hooks/common/useExampleItems.ts` (+ its three mutation-hook
+   siblings) and `src/services/common/exampleService.ts` — into `src/hooks/<concern>/` and
+   `src/services/<concern>/` for your new feature (hooks and services live under
+   `src/hooks/`/`src/services/`, not the component folder, so neither comes along
+   automatically with step 1's copy), and its schema into `src/schemas/<concern>/`.
 2. Rename files and the component, then replace the logic with yours.
-3. It already wires up: typed props, a TanStack Query hook, a Zustand store, a form with Zod
-   validation, full accessibility, and a README.
+3. It already wires up: typed props, a TanStack Query hook backed by a service file, a
+   Zustand store, a form with Zod validation, and full accessibility. No per-feature
+   `README.md` is part of this shape — AGENTS.md/this guide is the reference, not a
+   per-folder writeup.
 
 For a single reusable component instead, ask your AI tool for `/new-component`, or copy
 `src/components/common/Button.tsx` as a template.

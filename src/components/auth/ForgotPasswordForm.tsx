@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Input } from 'src/components/common/Input';
 import { Button } from 'src/components/common/Button';
 import { useForgotPassword } from 'src/hooks/auth/useAuth';
-import { forgotPasswordSchema, type ForgotPasswordValues } from 'src/schemas/auth.schema';
+import { forgotPasswordSchema, type ForgotPasswordValues } from 'src/schemas/auth/auth.schema';
 
 export function ForgotPasswordForm() {
   const navigate = useNavigate();

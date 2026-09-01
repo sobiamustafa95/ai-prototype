@@ -81,7 +81,9 @@ src/
   components/auth/       Auth forms only: LoginForm, SignupForm, OtpForm, ForgotPasswordForm,
                           ResetPasswordForm — pages that route to them live in src/pages/auth/
   components/example/    ExampleWidget (the one example feature: generic paginated list) —
-                          its data-fetching/mutation hooks live in hooks/common/, not here
+                          its data-fetching/mutation hooks live in hooks/common/, and
+                          their actual HTTP calls in services/common/exampleService.ts,
+                          not here
   components/<role>/     Components scoped to one role's own pages (see
                           routes/ProtectedRoutes.tsx) — none ship by default (both example
                           roles are placeholder pages with no role-specific components
@@ -125,25 +127,52 @@ src/
   services/<concern>/    api-client.ts and queryClient.ts stay at services/ root —
                           cross-cutting infrastructure every concern's service depends
                           on, not a "concern" of their own (same reasoning that keeps
-                          lib/utils.ts and constants/ un-concern-scoped), never
-                          services/common/. auth/authService.ts (real /auth contract)
-                          is the one concern folder that exists today; a future
-                          concern (e.g. a real cross-role service, not infra) gets its
-                          own services/<concern>/ the moment one is actually needed —
-                          same "stays empty until needed" precedent as hooks/admin/;
-                          see services/README.md.
+                          lib/utils.ts and constants/ un-concern-scoped). Every other
+                          file is a real API client for one concern, one file per
+                          concern (auth/authService.ts, common/exampleService.ts —
+                          same <concern> folders as hooks/<concern>/), one typed
+                          method per endpoint, matching authService.ts's shape (a
+                          plain object of async methods). **Hard rule: a hook's
+                          `queryFn`/`mutationFn` calls a service-file function — it
+                          never calls `apiClient` directly.** The service function
+                          owns the raw HTTP call *and* the boundary Zod validation;
+                          the hook owns only the TanStack Query wiring (cache key,
+                          invalidation, toast). A role concern's own folder (e.g.
+                          services/member/) doesn't exist until that role has a real
+                          service — same "stays empty until needed" precedent as
+                          hooks/admin/; see services/README.md.
   utils/                 Pure functions only (100% unit-testable)
-  schemas/               Zod schemas (forms + API contracts); common.schema.ts for
-                          shared primitives (email/password/phone/url)
-  types/<concern>/       Shared TS interfaces (types MAY be barrel-exported) — common/
+  schemas/<concern>/     Zod schemas (forms + API contracts), one folder per concern —
+                          same <concern> convention as components/hooks/services:
+                          auth/auth.schema.ts, common/common.schema.ts (shared
+                          primitives: email/password/phone/url) + common/example.schema.ts,
+                          or a role's own folder (e.g. member/) the moment that role
+                          has a real schema. A schema used by only one concern lives
+                          in that concern's own folder, never a flat
+                          src/schemas/*.schema.ts list.
+  types/<concern>/       Shared, hand-written TS interfaces (types MAY be barrel-exported
+                          — the one deliberate exception to the no-barrel rule) — common/
                           for anything genuinely cross-concern (ApiResponse, Paginated),
                           auth/ for auth-scoped types (AuthUser, AuthTokens). A type
                           used by only one concern lives in that concern's own folder,
                           never force-moved into common/ just because it exists; see
-                          types/README.md.
-  constants/             api-routes.ts (one enum per route group, e.g. AuthRoutes/
-                          ExampleRoutes), queryKeys.ts (the global QueryKey enum), config.ts,
-                          env.ts (validated env)
+                          types/README.md. This is a distinct category from a Zod-schema-
+                          derived type (ExampleItem, LoginValues, ...): those are never
+                          hand-duplicated here — they're exported straight from their
+                          schema file via `z.infer` (§ Data & State's "Zod schema →
+                          z.infer type" rule) and imported from `src/schemas/<concern>/`
+                          at every call site. `types/<concern>/` is for the types that
+                          have no schema behind them at all.
+  constants/              One API-route enum file per portal/concern — auth.ts
+                          (AuthRoutes), common.ts (CommonRoutes), and one such file
+                          per additional role/concern the moment it actually gets a
+                          real endpoint (see § Constant Registries) — never one enum
+                          per feature and never a flat api-routes.ts holding every
+                          group. queryKeys.ts (the global QueryKey enum, deliberately
+                          NOT split per-portal — see its own file comment for why) and
+                          config.ts/env.ts (cross-cutting infra, same "stays at root"
+                          reasoning as services/api-client.ts) are the concern-agnostic
+                          exceptions and stay flat at constants/ root.
   routes/                roles.ts (the Role registry), ProtectedRoutes.tsx (every protected
                           page + which roles may reach it + its sidebar nav entry, plus
                           getNavItemsForRole/getHomeRouteForRole/hasHomeRouteForRole/
@@ -186,11 +215,13 @@ Where things go — quick answers for "where does X go?":
   trapping, portals, roving tabindex) that's error-prone to hand-roll.
 - A screen/feature → **copy** `components/example/` + `pages/common/ExamplePage.tsx` (a
   data-driven list/search screen) or `components/auth/` + `pages/auth/` (a multi-page form
-  flow), whichever shape is closer, rename, gut the logic — **and also copy its hooks**,
-  which live in `hooks/common/` (`useExampleItems.ts` + its three mutation-hook siblings),
-  not the component folder itself, so they don't come along automatically. A component that
-  isn't role-specific gets its own folder at `components/<concern>/` (same level as
-  `common/`); a role-specific one gets `components/<role>/`, mirrored by `pages/<role>/`.
+  flow), whichever shape is closer, rename, gut the logic — **and also copy its hooks and
+  service**, which live in `hooks/common/` (`useExampleItems.ts` + its three mutation-hook
+  siblings) and `services/common/exampleService.ts`, not the component folder itself, so
+  neither comes along automatically. A component that isn't role-specific gets its own
+  folder at `components/<concern>/` (same level as `common/`); a role-specific one gets
+  `components/<role>/`, mirrored by `pages/<role>/`, `hooks/<role>/`,
+  `services/<role>/`, and `schemas/<role>/`.
 - A new role, or a route only some roles may reach → this is the **role system**
   (`src/routes/ProtectedRoutes.tsx`), not a one-off guard. Three steps, in order: add the
   role to `src/routes/roles.ts`'s `Role` enum; add its own routes to `ProtectedRoutes.tsx`
@@ -224,18 +255,33 @@ Where things go — quick answers for "where does X go?":
   `<concern>` is `common/` when the hook is genuinely cross-role (e.g. a feature reachable
   by every role, or truly generic logic) or a role name when the hook only ever makes
   sense inside that role's own pages — the same decision `src/components/<concern>/`
-  already makes, applied identically here. `src/hooks/common/useExampleItems.ts` (plus its
-  three mutation-hook siblings) is the reference shape. Failures toast automatically via
-  `queryClient.ts`; opt out per-call with `meta: { skipErrorToast: true }`.
+  already makes, applied identically here. **The hook itself never calls `apiClient`** —
+  its `queryFn`/`mutationFn` calls a function exported from the matching
+  `src/services/<concern>/<name>Service.ts` (see the Directory Map's `services/<concern>/`
+  entry and `src/services/README.md`); the service function owns the raw HTTP call and the
+  boundary Zod validation, the hook owns only the TanStack Query wiring. `src/hooks/common/
+useExampleItems.ts` + `src/services/common/exampleService.ts` (plus the three
+  mutation-hook/service-method siblings) is the reference shape. Failures toast
+  automatically via `queryClient.ts`; opt out per-call with `meta: { skipErrorToast: true }`.
 - UI-only state → a Zustand store (feature-scoped when feature-specific).
-- Form + validation → React Hook Form + a Zod schema in `src/schemas/`, composed from
-  `common.schema.ts` primitives where one already exists.
+- Form + validation → React Hook Form + a Zod schema in `src/schemas/<concern>/` (same
+  `<concern>` folder as everywhere else — see the Directory Map's `schemas/<concern>/`
+  entry), composed from `src/schemas/common/common.schema.ts` primitives where one already
+  exists.
 - User-facing text → a key in `src/i18n/locales/<lng>/common.json`, read via
   `useTranslation()`'s `t('KEY')` (or `i18n.t('KEY')` outside a component, e.g. a Zod
-  schema) — never hardcode a string in JSX.
-- API path → a member on the relevant enum in `src/constants/api-routes.ts` (one enum per
-  route group, e.g. `AuthRoutes`, `ExampleRoutes` — a real `enum` can't nest, so a new group
-  is its own enum, not a new key on an existing one).
+  schema) — never hardcode a string in JSX. i18n is split per **language** only (one
+  `common.json` per `<lng>`, holding every key the whole app uses) — never subdivided
+  further by concern/portal the way routes/schemas/services are; see § Internationalization.
+- API path → a member on the relevant portal/concern's route enum in
+  `src/constants/<concern>.ts` (`AuthRoutes` in `auth.ts`, `CommonRoutes` in `common.ts`,
+  and one such file per role/concern as each actually gets a real endpoint — see
+  § Constant Registries) — never a new enum per feature, and never a flat
+  `api-routes.ts` holding every group. The route string itself is an absolute path only
+  (e.g. `/example-items`) — never a hardcoded host or version prefix (no `/api/v1/...`);
+  the host comes from `VITE_API_BASE_URL` (`src/constants/env.ts`/`config.ts`), and there
+  is no shared prefix constant either, by design (see `.env.example`'s own instruction not
+  to add one).
 - Query key → a member on `src/constants/queryKeys.ts`'s `QueryKey` enum, referenced directly
   from the feature's query hook — never a per-feature key factory.
 - A new env var → add it to `.env.example`, `src/vite-env.d.ts`, and the Zod schema in
@@ -266,10 +312,28 @@ export enum Role {
 ```
 
 - **One flat enum per concern.** A real `enum` can't nest, so a grouped registry (the old
-  single `API_ROUTES` object) becomes one enum per group instead — `AuthRoutes`,
-  `ExampleRoutes` — not one enum trying to hold sub-objects. `Role` (`src/routes/roles.ts`)
-  and `QueryKey` (`src/constants/queryKeys.ts`) are the flat reference shapes;
-  `AuthRoutes`/`ExampleRoutes` (`src/constants/api-routes.ts`) is the multi-group shape.
+  single `API_ROUTES` object) becomes one enum per group instead. `Role`
+  (`src/routes/roles.ts`) and `QueryKey` (`src/constants/queryKeys.ts`) are the flat
+  reference shapes.
+- **API-route enums are grouped by portal/concern, never by feature.** One enum per
+  `src/constants/<concern>.ts` file — `AuthRoutes` in `auth.ts`, `CommonRoutes` in
+  `common.ts`, and so on for whatever roles/concerns actually exist in
+  `src/routes/roles.ts` at the time (this list is illustrative, not exhaustive or
+  permanent — a renamed or newly added role gets its own `constants/<role>.ts` the same
+  way, no special-casing needed, and that file does not exist until that role actually has
+  a real endpoint — same "stays empty until needed" precedent as an unpopulated
+  `hooks/<role>/`). A second feature within the same portal adds its own member to that
+  portal's existing enum — it does **not** get a new enum of its own. This is a correction
+  from an earlier shape of this boilerplate that grouped routes one enum per _feature_
+  instead of one enum per _portal_; that shape does not scale — a portal with five
+  features would otherwise need five separate enums instead of one place to look.
+- **No hardcoded host or version prefix on a route string.** Every route is an absolute
+  path only (`/example-items`, `/auth/login`) — the host comes from `VITE_API_BASE_URL`
+  (`src/constants/env.ts` → `config.ts` → `api-client.ts`'s axios `baseURL`), and there is
+  deliberately no shared `"/api/v1"`-style prefix constant either (see `.env.example`'s own
+  instruction against adding one to the base URL). A route string that embeds a version or
+  host prefix directly is a bug, not a style choice — it silently breaks the moment the
+  same app talks to a differently-versioned or differently-hosted backend.
 - **`enum`, never `const enum`.** This repo's `isolatedModules`/`verbatimModuleSyntax`
   (`tsconfig.app.json`/`tsconfig.node.json`) transpile file-by-file via esbuild, which does not
   support `const enum` inlining — using one either errors or silently falls back to a real
@@ -304,6 +368,17 @@ export enum Role {
 - Reach for a Radix primitive (`@radix-ui/react-*`) for anything with real interaction
   behavior — dialogs, popovers, dropdowns, toasts, tabs. Don't hand-roll focus trapping or
   portal logic that Radix already solved.
+- **A new look on an existing `src/components/common/` primitive is a new `cva()` variant
+  on that component, never a parallel one-off component.** Before scaffolding a new common
+  component, ask "is this genuinely a new kind of thing, or is it `Button`/`Input`/`Dialog`/
+  etc. with a different variant/size/shape?" — a circular icon-only floating action button,
+  for example, is `Button` with `size="icon" shape="circle"` (see `Button.tsx`'s `shape`
+  variant), not a standalone `FloatingActionButton.tsx`. Position (fixed/absolute
+  placement) is page layout, not part of a component's reusable look, so it's fine to pass
+  positioning classes via the caller's `className` — that is not the same as hoisting the
+  component's actual visual identity out into a one-off duplicate. This is the same
+  reasoning `fe-component-scaffold`'s duplicate-check step applies before scaffolding
+  anything new (`.claude/skills/fe-component-scaffold/SKILL.md`).
 
 ---
 
@@ -312,6 +387,15 @@ export enum Role {
 - **Server state:** TanStack Query only. Validate payloads with Zod at the boundary. Errors
   toast automatically (`queryClient.ts`'s `QueryCache`/`MutationCache` `onError`) — opt a
   specific call out with `meta: { skipErrorToast: true }` when it renders its own inline error.
+- **Hooks call services, never `apiClient` directly.** A `src/hooks/<concern>/` hook's
+  `queryFn`/`mutationFn` is a call to a function exported from the matching
+  `src/services/<concern>/<name>Service.ts` — the service function is what actually calls
+  `apiClient` and Zod-validates the response at the boundary. The hook itself owns only the
+  TanStack Query wiring: cache key, `placeholderData`, invalidation, toast. See
+  `src/services/README.md` and `src/services/auth/authService.ts` (the original reference
+  shape) / `src/services/common/exampleService.ts` (the feature-service reference shape) —
+  a service file is a plain object of typed async methods, one method per endpoint, same
+  shape regardless of concern.
 - **Query keys:** every query key is a named member of the single global registry
   `src/constants/queryKeys.ts` (`QueryKey`), referenced directly in a feature's `queryKey`
   array — never a per-feature key factory, never an inline string literal in the hook itself:
@@ -329,11 +413,13 @@ export enum Role {
   against a list something on screen already reads via `useQuery`) — confirm success with
   `toast.success(...)` inside the hook's `useMutation({ onSuccess })`, then `return` the result
   of `queryClient.invalidateQueries(...)` from that same `onSuccess` so the mutation stays
-  pending until the refetch lands. **`src/components/example/`'s `useCreateExampleItem.ts`/
-  `useUpdateExampleItem.ts`/`useDeleteExampleItem.ts` are the reference implementation of this
-  exact pattern** — copy their shape (one small mutation hook per operation,
-  `useQueryClient()` from React context, never the app's shared `queryClient` singleton import)
-  for any new create/update/delete hook. This is exactly the class of bug `react-doctor`'s
+  pending until the refetch lands. **`src/hooks/common/useCreateExampleItem.ts`/
+  `useUpdateExampleItem.ts`/`useDeleteExampleItem.ts` (calling into
+  `src/services/common/exampleService.ts`) are the reference implementation of this exact
+  pattern** — copy their shape (one small mutation hook per operation, each `mutationFn`
+  delegating to the matching service method, `useQueryClient()` from React context, never
+  the app's shared `queryClient` singleton import) for any new create/update/delete hook.
+  This is exactly the class of bug `react-doctor`'s
   `query-mutation-missing-invalidation` rule catches — found four real instances of it in this
   boilerplate's own Auth forms during a QA pass, which is what prompted adding the
   `ExampleWidget` CRUD reference in the first place; a one-off action with nothing cached to
@@ -347,8 +433,8 @@ export enum Role {
   folder. Auth state (`authStore.ts`) is `persist`-backed — it is the single source of truth
   for the access/refresh token pair; nothing else touches `localStorage` for it directly.
 - **Forms:** React Hook Form + `zodResolver`; share Zod types between form + API. Reuse a
-  primitive from `src/schemas/common.schema.ts` (email/password/phone/url) instead of
-  redefining validation inline when one already covers the field.
+  primitive from `src/schemas/common/common.schema.ts` (email/password/phone/url) instead
+  of redefining validation inline when one already covers the field.
 - **Zod v4, not v3.** Use the top-level string formats — `z.email()`, `z.url()`, `z.uuid()` —
   never the deprecated `z.string().email()`. For a required-then-format field, chain
   `z.string().trim().min(1, '<Field> is required').pipe(z.email('Enter a valid email'))` so an
@@ -372,6 +458,14 @@ export enum Role {
 
 Every user-facing string is a key in `src/i18n/locales/<lng>/common.json` — there is no
 hardcoded-string escape hatch and no separate `ui-strings.ts`-style constants file.
+
+**i18n is split per language only — never further subdivided by concern/portal.** Unlike
+routes (`src/constants/<concern>.ts`), schemas (`src/schemas/<concern>/`), services
+(`src/services/<concern>/`), and hooks (`src/hooks/<concern>/`), there is no
+`locales/en/auth.json`/`locales/en/member.json`-style split. One `common.json` per `<lng>`
+holds every key the whole app uses, regardless of which portal/feature reads it — a new
+feature (auth, common, or role-specific) still adds its keys to that same single file per
+language. Do not introduce a per-concern i18n split.
 
 - **Inside a component:** `const { t } = useTranslation(); ...{t('BUTTON_SAVE')}`.
 - **Outside a component** (a Zod schema, `queryClient.ts`'s error handler, anything built

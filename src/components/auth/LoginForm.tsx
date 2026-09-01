@@ -6,7 +6,7 @@ import { Input } from 'src/components/common/Input';
 import { PasswordInput } from 'src/components/common/PasswordInput';
 import { Button } from 'src/components/common/Button';
 import { useLogin } from 'src/hooks/auth/useAuth';
-import { loginSchema, type LoginValues } from 'src/schemas/auth.schema';
+import { loginSchema, type LoginValues } from 'src/schemas/auth/auth.schema';
 import { getHomeRouteForRole } from 'src/routes/ProtectedRoutes';
 
 interface LocationState {

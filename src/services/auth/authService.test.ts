@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { server } from 'src/mocks/server';
-import { AuthRoutes } from 'src/constants/api-routes';
+import { AuthRoutes } from 'src/constants/auth';
 import { authService } from './authService';
 
 function envelope(data: unknown) {

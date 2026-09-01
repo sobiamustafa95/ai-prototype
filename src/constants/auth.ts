@@ -1,9 +1,10 @@
 /**
- * Centralized API route definitions. No concrete business entity may live here —
- * `AuthRoutes` mirrors the real `/auth` backend contract, and `ExampleRoutes`
- * backs the one example feature. Real projects add their own route group as its
- * own enum, following this shape — a real `enum` can't nest, so each concern
- * gets its own flat enum rather than one shared, nested registry.
+ * `Role`-agnostic auth-flow API routes — the one concern folder every portal shares,
+ * same as `src/components/auth/`/`src/hooks/auth/`. Routes are absolute path segments
+ * only (no host, no version prefix) — `src/services/api-client.ts`'s `baseURL` supplies
+ * the host, and there is deliberately no shared "/api/v1"-style prefix constant either:
+ * see AGENTS.md § Constant Registries for why a prefix never belongs on an individual
+ * route string.
  */
 export enum AuthRoutes {
   SIGNUP = '/auth/signup',
@@ -21,9 +22,4 @@ export enum AuthRoutes {
   LOGOUT = '/auth/logout',
   LOGOUT_ALL_DEVICES = '/auth/logout-all-devices',
   ACTIVE_SESSIONS = '/auth/active-sessions',
-}
-
-// Backs src/components/example/ExampleWidget — copy & rename per feature.
-export enum ExampleRoutes {
-  LIST = '/api/v1/example-items',
 }

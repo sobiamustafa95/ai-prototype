@@ -1,7 +1,7 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Input } from 'src/components/common/Input';
-import type { ExampleItemInput } from 'src/schemas/example.schema';
+import type { ExampleItemInput } from 'src/schemas/common/example.schema';
 
 interface ExampleItemFormFieldsProps {
   register: UseFormRegister<ExampleItemInput>;

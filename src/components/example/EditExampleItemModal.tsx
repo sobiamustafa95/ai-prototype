@@ -8,7 +8,7 @@ import {
   exampleItemInputSchema,
   type ExampleItem,
   type ExampleItemInput,
-} from 'src/schemas/example.schema';
+} from 'src/schemas/common/example.schema';
 import { useUpdateExampleItem } from 'src/hooks/common/useUpdateExampleItem';
 import { ExampleItemFormFields } from 'src/components/example/ExampleItemFormFields';
 

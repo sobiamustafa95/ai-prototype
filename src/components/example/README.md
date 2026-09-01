@@ -21,16 +21,22 @@ screen-reader-accessible.
 
 - `ExampleWidget.tsx` — the feature component (typed props, search form, list,
   pagination, Add/Edit/Delete actions).
-- `src/hooks/common/useExampleItems.ts` — TanStack Query hook; fetches + Zod-validates
-  the list at the boundary. Keyed off `QueryKey.EXAMPLE_LIST` in the global registry
+- `src/services/common/exampleService.ts` — the actual API client: one typed async method
+  per endpoint (`list`/`create`/`update`/`delete`), each calling `apiClient` and
+  Zod-validating the response at the boundary before returning. Every hook below calls
+  into this file — none of them call `apiClient` directly (AGENTS.md § Data & State's
+  hard rule).
+- `src/hooks/common/useExampleItems.ts` — TanStack Query hook; its `queryFn` calls
+  `exampleService.list`. Keyed off `QueryKey.EXAMPLE_LIST` in the global registry
   (`src/constants/queryKeys.ts`) — a new feature adds its own member there rather than
   defining a local key. Lives in `src/hooks/common/`, not this folder — every hook in
   this repo does (company-wide convention: `src/hooks/<concern>/<hookName>.ts`, `common`
   since this feature isn't role-specific — see `AGENTS.md` § Directory Map).
 - `src/hooks/common/useCreateExampleItem.ts` / `useUpdateExampleItem.ts` /
   `useDeleteExampleItem.ts` — one small `useMutation` hook each, same `src/hooks/common/`
-  location. Each `onSuccess` is the reference shape for the invalidation rule:
-  `toast.success(...)`, then `return
+  location, each `mutationFn` calling the matching `exampleService` method. Each
+  `onSuccess` is the reference shape for the invalidation rule: `toast.success(...)`,
+  then `return
 queryClient.invalidateQueries({ queryKey: [QueryKey.EXAMPLE_LIST] })` so the
   mutation stays pending until the refetch actually lands. `useQueryClient()` (React
   context), never the app's shared `queryClient` singleton — the same client a test's
@@ -76,16 +82,21 @@ otherwise leak into the next.
 
 ## API dependency
 
-- `GET /api/v1/example-items?q=&page=&pageSize=` — list.
-- `POST /api/v1/example-items` — create.
-- `PATCH /api/v1/example-items/:id` — update.
-- `DELETE /api/v1/example-items/:id` — delete.
+- `GET /example-items?q=&page=&pageSize=` — list.
+- `POST /example-items` — create.
+- `PATCH /example-items/:id` — update.
+- `DELETE /example-items/:id` — delete.
 
-All mocked by MSW (`src/mocks/handlers.ts`). No `ExampleRoutes` member exists for the
-`:id` path — a real `enum` can only hold string/numeric literals, never a function
-building a path, so the per-id path interpolates `ExampleRoutes.LIST` at the call
-site (`` `${ExampleRoutes.LIST}/${id}` ``) instead — see AGENTS.md § Constant
-Registries.
+Backed by `CommonRoutes.EXAMPLE_ITEMS` (`src/constants/common.ts`) — routes are grouped
+by **portal/concern** (`common`, since this feature isn't role-specific), not by feature,
+and the path is host-only/absolute (no `/api/v1`-style prefix — the host comes from
+`VITE_API_BASE_URL`; see AGENTS.md § Constant Registries). All mocked by MSW
+(`src/mocks/handlers.ts`). No `CommonRoutes` member exists for the `:id` path — a real
+`enum` can only hold string/numeric literals, never a function building a path, so the
+per-id path interpolates `CommonRoutes.EXAMPLE_ITEMS` at the call site inside
+`exampleService.ts` (`` `${CommonRoutes.EXAMPLE_ITEMS}/${id}` ``) instead. The Zod
+contract (`exampleItemSchema` etc.) lives in `src/schemas/common/example.schema.ts` —
+one schema folder per portal/concern, same convention as the route enum.
 
 ## Known scope limitation: this is a modal-based CRUD reference, not a detail-route one
 

@@ -10,7 +10,7 @@ import {
   exampleSearchSchema,
   type ExampleItem,
   type ExampleSearchValues,
-} from 'src/schemas/example.schema';
+} from 'src/schemas/common/example.schema';
 import { useExampleItems } from 'src/hooks/common/useExampleItems';
 import { EXAMPLE_PAGE_SIZE, useExampleWidgetStore } from './exampleWidgetStore';
 import { AddExampleItemModal } from './AddExampleItemModal';

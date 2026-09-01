@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { renderWithProviders } from 'src/test/renderWithProviders';
 import { server } from 'src/mocks/server';
-import { AuthRoutes } from 'src/constants/api-routes';
+import { AuthRoutes } from 'src/constants/auth';
 import { SignupForm } from './SignupForm';
 
 /** Stand-in for the real VerifySignupOtpPage — proves navigation + router state,

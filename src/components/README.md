@@ -34,6 +34,11 @@ this structure — see `src/pages/README.md`.
 4. No hardcoded user-facing text — add a key to `src/i18n/locales/<lng>/common.json` and
    read it with `useTranslation()`'s `t('KEY')`.
 5. Design tokens only — no arbitrary Tailwind values (`w-[127px]`).
-6. Every feature folder has a `README.md`.
+6. A new look on an existing `common/` primitive is a new `cva()` variant on that
+   component, never a parallel one-off component (see `Button.tsx`'s `shape`/`size="icon"`
+   variants — the reference case is a floating circular action button, which is `Button`,
+   not a standalone `FloatingActionButton`).
+7. No per-feature `README.md` — `AGENTS.md`/`docs/GUIDE.md` is the reference for how a
+   feature is shaped; a feature folder does not additionally document itself.
 
 See `AGENTS.md` for the full, authoritative rule set.

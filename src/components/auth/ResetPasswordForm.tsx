@@ -6,7 +6,7 @@ import { PasswordInput } from 'src/components/common/PasswordInput';
 import { Button } from 'src/components/common/Button';
 import { useResetPassword } from 'src/hooks/auth/useAuth';
 import { toast } from 'src/stores/toastStore';
-import { resetPasswordSchema, type ResetPasswordValues } from 'src/schemas/auth.schema';
+import { resetPasswordSchema, type ResetPasswordValues } from 'src/schemas/auth/auth.schema';
 
 interface ResetPasswordFormProps {
   /** Single-use reset token from the OTP-verify step or the emailed reset link. */

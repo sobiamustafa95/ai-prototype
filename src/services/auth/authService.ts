@@ -1,5 +1,5 @@
 import { apiClient } from 'src/services/api-client';
-import { AuthRoutes } from 'src/constants/api-routes';
+import { AuthRoutes } from 'src/constants/auth';
 import type { ApiResponse } from 'src/types/common';
 import type { AuthTokens, AuthUser } from 'src/types/auth';
 
@@ -9,7 +9,7 @@ interface Session {
 }
 
 /**
- * Auth API client — one method per `AuthRoutes` endpoint (src/constants/api-routes.ts).
+ * Auth API client — one method per `AuthRoutes` endpoint (src/constants/auth.ts).
  * This boilerplate's Auth contract ships hand-authored as a reference stub (each method
  * below documents its own behavior) rather than generated from a spec — a real backend
  * integration would instead run the `fe-api-guide` skill

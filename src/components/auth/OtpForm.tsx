@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Input } from 'src/components/common/Input';
 import { Button } from 'src/components/common/Button';
 import { toast } from 'src/stores/toastStore';
-import { otpSchema, type OtpValues } from 'src/schemas/auth.schema';
+import { otpSchema, type OtpValues } from 'src/schemas/auth/auth.schema';
 
 interface OtpFormProps {
   /** Shown as read-only context above the code field. */

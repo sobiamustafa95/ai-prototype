@@ -52,12 +52,12 @@ them). The **pages** that route to them — layout glue, `Seo`, reading
   `accessToken`, `refreshToken`, and `user` are the single source of truth;
   `api-client.ts` reads/writes them directly, never via a component or
   `localStorage` read.
-- **Form state:** React Hook Form + Zod (`src/schemas/auth.schema.ts`), composed from
-  `src/schemas/common.schema.ts` primitives (email/password/phone).
+- **Form state:** React Hook Form + Zod (`src/schemas/auth/auth.schema.ts`), composed from
+  `src/schemas/common/common.schema.ts` primitives (email/password/phone).
 
 ## API dependency
 
-`src/constants/api-routes.ts` § `AUTH` mirrors the real backend's `/auth/*` paths;
+`src/constants/auth.ts`'s `AuthRoutes` mirrors the real backend's `/auth/*` paths;
 `src/services/auth/authService.ts` has one typed method per endpoint, called only from
 `src/hooks/auth/useAuth.ts` (never straight from a form/page) and from `api-client.ts`'s
 own refresh-token handling. `src/mocks/handlers.ts` mocks the same envelope/shapes for

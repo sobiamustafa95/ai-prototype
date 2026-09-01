@@ -1,6 +1,6 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { CONFIG } from 'src/constants/config';
-import { AuthRoutes } from 'src/constants/api-routes';
+import { AuthRoutes } from 'src/constants/auth';
 import { useAuthStore } from 'src/stores/authStore';
 import { authService } from 'src/services/auth/authService';
 

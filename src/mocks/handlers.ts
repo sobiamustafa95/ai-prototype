@@ -1,8 +1,9 @@
 import { http, HttpResponse } from 'msw';
-import { AuthRoutes, ExampleRoutes } from 'src/constants/api-routes';
+import { AuthRoutes } from 'src/constants/auth';
+import { CommonRoutes } from 'src/constants/common';
 import { Role } from 'src/routes/roles';
 import type { AuthTokens, AuthUser } from 'src/types/auth';
-import type { ExampleItem } from 'src/schemas/example.schema';
+import type { ExampleItem } from 'src/schemas/common/example.schema';
 
 function buildExampleItems(): ExampleItem[] {
   return Array.from({ length: 42 }, (_, index) => ({
@@ -156,8 +157,8 @@ export const handlers = [
     ])
   ),
 
-  // ---- Example feature: paginated + searchable list ----
-  http.get(ExampleRoutes.LIST, ({ request }) => {
+  // ---- Example feature (common portal): paginated + searchable list ----
+  http.get(CommonRoutes.EXAMPLE_ITEMS, ({ request }) => {
     const url = new URL(request.url);
     const query = (url.searchParams.get('q') ?? '').toLowerCase();
     const page = Number(url.searchParams.get('page') ?? '1');
@@ -178,7 +179,7 @@ export const handlers = [
 
     return envelope({ items, page, pageSize, total: filtered.length });
   }),
-  http.post(ExampleRoutes.LIST, async ({ request }) => {
+  http.post(CommonRoutes.EXAMPLE_ITEMS, async ({ request }) => {
     const { title, description } = (await request.json()) as { title: string; description: string };
     // Reserved title for the "server error" workflow-test scenario — same
     // convention as the list endpoint's '__error__' query above.
@@ -190,7 +191,7 @@ export const handlers = [
     EXAMPLE_ITEMS.unshift(created);
     return envelope(created, 'Item created.');
   }),
-  http.patch(`${ExampleRoutes.LIST}/:id`, async ({ request, params }) => {
+  http.patch(`${CommonRoutes.EXAMPLE_ITEMS}/:id`, async ({ request, params }) => {
     const { title, description } = (await request.json()) as { title: string; description: string };
     if (title === '__error__') {
       return HttpResponse.json({ message: 'Internal server error.' }, { status: 500 });
@@ -204,7 +205,7 @@ export const handlers = [
     EXAMPLE_ITEMS[index] = updated;
     return envelope(updated, 'Item updated.');
   }),
-  http.delete(`${ExampleRoutes.LIST}/:id`, ({ params }) => {
+  http.delete(`${CommonRoutes.EXAMPLE_ITEMS}/:id`, ({ params }) => {
     const id = String(params['id']);
     // Reserved id for the "server error" workflow-test scenario — never a real
     // generated id (those are always `item-<n>`).

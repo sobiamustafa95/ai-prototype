@@ -90,11 +90,15 @@ you. (Full detail lives in `AGENTS.md` — this is the checklist, not the rulebo
   layer — it does not unit-test `Button`/`Input`/`Dialog` in isolation. The workflow test is
   part of what you copy, not a follow-up step.
 - ✅ **Adding a new API route or query key follows the same registry pattern as roles.** A new
-  endpoint is a member on the relevant enum in `src/constants/api-routes.ts` (e.g.
-  `AuthRoutes`, `ExampleRoutes` — a new route _group_ gets its own enum, since a real `enum`
-  can't nest). A new cached query is a member on `QueryKey` in `src/constants/queryKeys.ts`,
-  referenced directly in the feature's query hook (`queryKey: [QueryKey.YOUR_KEY, params]`) —
-  never an inline string literal, never a per-feature key factory.
+  endpoint is a member on the relevant **portal/concern's** enum in `src/constants/<concern>.ts`
+  (e.g. `AuthRoutes` in `auth.ts`, `CommonRoutes` in `common.ts`) — grouped by portal, never by
+  feature, and a route string is always absolute/host-only (never a hardcoded `/api/v1`-style
+  prefix). A new portal/concern gets its own `constants/<concern>.ts` file the moment it's
+  actually needed, since a real `enum` can't nest. A new cached query is a member on
+  `QueryKey` in `src/constants/queryKeys.ts` (deliberately flat/global, unlike the route
+  enums), referenced directly in the feature's query hook
+  (`queryKey: [QueryKey.YOUR_KEY, params]`) — never an inline string literal, never a
+  per-feature key factory.
 - ✅ **Adding a new language** is copy-translate-register, nothing more: copy
   `src/i18n/locales/en/common.json` to `locales/<lng>/common.json`, translate every value
   (keep the keys identical), then add it to the `resources` object in `src/i18n/index.ts`.

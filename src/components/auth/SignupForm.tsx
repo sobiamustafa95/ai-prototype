@@ -6,7 +6,7 @@ import { Input } from 'src/components/common/Input';
 import { PasswordInput } from 'src/components/common/PasswordInput';
 import { Button } from 'src/components/common/Button';
 import { useSignup } from 'src/hooks/auth/useAuth';
-import { signupSchema, type SignupValues } from 'src/schemas/auth.schema';
+import { signupSchema, type SignupValues } from 'src/schemas/auth/auth.schema';
 
 export function SignupForm() {
   const navigate = useNavigate();

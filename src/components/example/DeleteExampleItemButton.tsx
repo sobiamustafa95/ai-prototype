@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from 'src/components/common/ConfirmDialog';
 import { Button } from 'src/components/common/Button';
-import type { ExampleItem } from 'src/schemas/example.schema';
+import type { ExampleItem } from 'src/schemas/common/example.schema';
 import { useDeleteExampleItem } from 'src/hooks/common/useDeleteExampleItem';
 
 interface DeleteExampleItemButtonProps {

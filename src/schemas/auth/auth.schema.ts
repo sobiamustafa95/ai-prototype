@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { emailSchema, passwordSchema, phoneSchema } from 'src/schemas/common.schema';
+import { emailSchema, passwordSchema, phoneSchema } from 'src/schemas/common/common.schema';
 import i18n from 'src/i18n';
 
 /** Login form schema — generic auth stub, no product assumptions. */

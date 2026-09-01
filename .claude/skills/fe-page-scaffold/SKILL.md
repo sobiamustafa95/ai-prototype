@@ -128,12 +128,20 @@ The page file itself:
   role-gated → `ProtectedRoutes.tsx`; guest-only → `PublicRoutes.tsx`; reachable whether
   signed in or not → `AppRouters.tsx`'s public shell block.
 
-## Step 6 — New hooks
+## Step 6 — New hooks, services, routes, and schemas
 
 Any new data-fetching hook a piece needs goes under `src/hooks/<concern>/<hookName>.ts` —
 `common/` unless it's genuinely specific to one role's own pages — never co-located inside a
-component folder. See `AGENTS.md` § Directory Map and `src/hooks/common/useExampleItems.ts`
-for the reference shape. This is the company-wide hook convention, not specific to this skill.
+component folder. **The hook's `queryFn`/`mutationFn` calls a function exported from a
+matching `src/services/<concern>/<name>Service.ts` file — it never calls `apiClient`
+directly**; the service function owns the HTTP call and the boundary Zod validation. See
+`AGENTS.md` § Directory Map / § Data & State and `src/hooks/common/useExampleItems.ts` +
+`src/services/common/exampleService.ts` for the reference shape. Any new API endpoint is a
+member on the relevant portal/concern's existing route enum in `src/constants/<concern>.ts`
+(never a new enum per feature, never a hardcoded host/version prefix on the route string),
+and its Zod schema lives in `src/schemas/<concern>/`. This is the company-wide convention,
+not specific to this skill — `fe-component-scaffold`'s own build step for a feature applies
+identically here, per piece.
 
 ## Step 7 — Test the actual composing file
 

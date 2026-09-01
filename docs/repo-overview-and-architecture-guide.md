@@ -98,9 +98,11 @@ src/
 
   stores/         Zustand stores, one per domain slice (authStore is
                   persist-backed; themeStore drives light/dark/system)
-  schemas/        Zod schemas — forms and API contracts alike
-  constants/      api-routes.ts (one enum per route group), queryKeys.ts (the
-                  global query-key enum), config.ts, env.ts
+  schemas/<concern>/  Zod schemas — forms and API contracts alike, one folder per
+                  concern (auth/, common/, and one per role once it has a real schema)
+  constants/      One route-enum file per portal/concern (auth.ts, common.ts, and one
+                  per role once it has a real endpoint), plus queryKeys.ts (the
+                  global query-key enum, deliberately flat/not per-concern), config.ts, env.ts
   i18n/           i18next setup + locales/<lng>/common.json — the only source
                   of user-facing text in the whole app
   mocks/          MSW handlers.ts (shared fixtures) + browser.ts + server.ts
@@ -111,14 +113,15 @@ src/
 
 ### 3a. The `<concern>/` subfolder pattern (important, and recent)
 
-`hooks/`, `services/`, and `types/` are **not** flat folders — every file lives one level
-deeper, under a **concern** folder:
+`hooks/`, `services/`, `types/`, and `schemas/` are **not** flat folders — every file lives
+one level deeper, under a **concern** folder:
 
 - **`common/`** — anything generic or usable by every role/feature.
 - **`auth/`** — anything scoped specifically to the auth flow.
 - **a role name** (`admin/`, `member/`, or a future portal) — anything genuinely specific to
-  one role's own pages. These don't exist yet for `hooks/`/`services/`/`types/` — that's
-  expected, not a gap. They're created the moment something role-specific is actually needed.
+  one role's own pages. Neither exists yet for any of the four — that's expected, not a gap.
+  A role's own folder is created the moment something genuinely role-specific is actually
+  needed.
 
 This mirrors the identical convention `components/<concern>/` and `pages/<concern>/` already
 use. `services/` has one deliberate exception: `api-client.ts` and `queryClient.ts` stay at
@@ -126,10 +129,19 @@ the `services/` root rather than under `services/common/`, because they're cross
 infrastructure every concern's service depends on — not a "concern" in their own right (the
 same reasoning that keeps `lib/utils.ts` un-concern-scoped).
 
-**The rule for a new hook/service/type:** figure out which concern it belongs to using the
-exact same logic as `components/<concern>/` — is it generic/cross-role, or specific to one
-flow/role? — then create (or reuse) that concern's folder. Never leave a new file flat at the
-old top level.
+`constants/` follows a close variant of the same pattern, one file per concern rather than
+one folder per concern (`auth.ts`, `common.ts`, and one such file per role the moment it
+has a real endpoint, each holding that portal's own API-route enum) — `queryKeys.ts`,
+`config.ts`, and `env.ts` are the deliberate exceptions
+that stay flat/concern-agnostic (a query key is deliberately a single global registry, not
+grouped by portal — see that file's own comment; `config.ts`/`env.ts` are cross-cutting
+infra, same reasoning as `services/api-client.ts`).
+
+**The rule for a new hook/service/type/schema/route:** figure out which concern it belongs
+to using the exact same logic as `components/<concern>/` — is it generic/cross-role, or
+specific to one flow/role? — then create (or reuse) that concern's folder/file. Never leave
+a new file flat at the old top level, and never group by feature instead of by concern (one
+`MemberRoutes` enum for every member-portal feature, not a new enum per feature).
 
 ---
 
@@ -239,15 +251,19 @@ fragment of an already-reachable page should be.
 
 **Two reference features, meant purely to be copied.** `components/example/` +
 `pages/common/ExamplePage.tsx` is the reference for a data-driven list/search screen with full
-create/update/delete — copy the folder, rename it, gut the logic, and copy its hooks from
-`hooks/common/` too (they don't come along automatically). `components/auth/` + `pages/auth/`
-is the reference for a multi-page form flow. Neither is meant to be extended in place.
+create/update/delete — copy the folder, rename it, gut the logic, and copy its hooks/service
+from `hooks/common/`/`services/common/exampleService.ts` too (they don't come along
+automatically). `components/auth/` + `pages/auth/` is the reference for a multi-page form
+flow. Neither is meant to be extended in place.
 
 **Closed value sets are real TypeScript `enum`s, not `as const` objects.** Roles
-(`Role.MEMBER`/`Role.ADMIN`), API route groups (`AuthRoutes`, `ExampleRoutes`), and query keys
-(`QueryKey`) are all `enum`s — one flat enum per concern, since a real enum can't nest.
-Comparing an enum against an untyped external string (a JWT claim, an API response) needs an
-explicit boundary cast; assigning a `Role` member _into_ a plain `string` field never does.
+(`Role.MEMBER`/`Role.ADMIN`) and query keys (`QueryKey`) are flat, single global enums; API
+routes are grouped one enum per **portal/concern** — `AuthRoutes` (`constants/auth.ts`),
+`CommonRoutes` (`constants/common.ts`), and one such enum per additional role/concern the
+moment it has a real endpoint — never one enum per feature, since a real enum can't nest.
+Comparing an enum against an untyped
+external string (a JWT claim, an API response) needs an explicit boundary cast; assigning a
+`Role` member _into_ a plain `string` field never does.
 
 **A role's components can never import another role's.** `components/admin/` can never
 import from `components/member/` (or vice versa) — component-to-component or

@@ -1,6 +1,6 @@
 ---
 name: fe-component-scaffold
-description: Use when creating a new React component or feature folder. Starts by pinning down the component's identity (name + feature/purpose) and whether a design reference exists (Figma/pen.dev frame + screenshot, or none), then scaffolds it — typed props interface, and (for features) a required README — following the ExampleWidget shape and matching the existing design system.
+description: Use when creating a new React component or feature folder. Starts by pinning down the component's identity (name + feature/purpose) and whether a design reference exists (Figma/pen.dev frame + screenshot, or none), then scaffolds it — typed props interface, hooks backed by a service file, no per-feature README — following the ExampleWidget shape and matching the existing design system.
 ---
 
 # Scaffolding a component or feature
@@ -64,12 +64,29 @@ don't rely on remembering the repo from earlier in the conversation:
 - List `src/components/common/` and, if Step 1 named a concern/portal folder, that folder too
   (`src/components/<concern>/` or `src/components/<portal>/`). Read the props/purpose of
   anything that looks related, not just filenames that happen to match.
+- **Don't just match "same core purpose" — also ask "is this a new variant of an existing
+  component?"** A near-duplicate isn't only "another table/list/modal" — it's also a
+  different _look_ (shape, size, position) of something that already exists but currently
+  only ships one look. Concretely: before scaffolding anything that is fundamentally a
+  `<button>` (an icon-only trigger, a floating action button, a toolbar button, a link
+  styled as a button, ...), check whether `Button.tsx`'s existing `variant`/`size` axes
+  already cover it, or would with one more `cva()` variant — same question for anything
+  that's fundamentally an `<input>`, a modal/overlay, a list row, etc. against `Input.tsx`/
+  `Dialog.tsx`/whatever's closest. A worked example from this exact failure mode: a
+  circular, icon-only, fixed-position "+" trigger was once built as a standalone
+  `FloatingActionButton.tsx` — wrong, because "circular, icon-only, fixed-position" is
+  three variant/shape/position facts about a button, not a different kind of component.
+  The fix was a `shape` variant (`default`/`circle`) and a `size="icon"` on `Button.tsx`
+  itself; position (`className="fixed right-6 bottom-6"`) is page layout passed at the
+  call site, not part of the component's look. Ask this question even when nothing in
+  `src/components/common/` shares the new piece's exact filename or literal purpose —
+  the match to look for is "shape of the interaction," not "identical feature."
 - Decide, and act accordingly:
-  - **Near-duplicate exists** (same core purpose — e.g. a generic table, a generic list, a
-    generic modal — missing only a variant/prop/size the new use case needs) → extend the
-    existing component (a new `cva()` variant, a new prop, a new size) instead of scaffolding
-    a parallel one. Implement inside that existing file and stop here — do not continue to
-    Step 4 as if this were a new component.
+  - **Near-duplicate exists, or the new piece is really a variant of an existing one**
+    (same core purpose _or_ the same underlying primitive with a different variant/size/
+    shape) → extend the existing component (a new `cva()` variant, a new prop, a new size/
+    shape) instead of scaffolding a parallel one. Implement inside that existing file and
+    stop here — do not continue to Step 4 as if this were a new component.
   - **No real overlap** → proceed to Step 4.
   - **Ambiguous** (partial overlap; extending might compromise the existing component's
     simplicity or its other callers) → ask the user directly, e.g.: _"This repo already has
@@ -77,7 +94,9 @@ don't rely on remembering the repo from earlier in the conversation:
     this genuinely a separate component?"_ Do not decide unilaterally — a duplicate primitive
     that quietly drifts from its sibling is exactly the failure mode this step exists to
     prevent (see `AGENTS.md`'s Never-list: a component that only works for its first call site
-    belongs in props, not a copy-paste).
+    belongs in props, not a copy-paste; and `AGENTS.md` § Component Conventions' "a new look
+    on an existing common component is a new `cva()` variant, never a parallel component"
+    rule).
 
 ## Step 4 — Build
 
@@ -101,18 +120,27 @@ decided in Step 1.
 ### A feature (`src/components/<concern-or-portal>/<Name>/`)
 
 Copy `src/components/example/` and rename; gut the logic. Its hooks live in
-`src/hooks/common/`, not the component folder — copy those too, into
-`src/hooks/<concern>/` for the new feature (`common/` unless the feature is genuinely
-role-specific), not alongside `<Name>.tsx`. Keep:
+`src/hooks/common/` and its service in `src/services/common/exampleService.ts`, not the
+component folder — copy both too, into `src/hooks/<concern>/` and
+`src/services/<concern>/` for the new feature (`common/` unless the feature is genuinely
+role-specific), not alongside `<Name>.tsx`. Its schema (`src/schemas/common/
+example.schema.ts`) moves into `src/schemas/<concern>/` the same way. Keep:
 
-- `<Name>.tsx` (component), `<name>Store.ts` (feature-scoped Zustand UI state, if needed),
-  and a **required** `README.md` (what it does, key components, state approach, API
-  dependency).
-- `use<Name>*.ts` (TanStack Query hook, Zod-validated, keyed off a new member on
+- `<Name>.tsx` (component) and `<name>Store.ts` (feature-scoped Zustand UI state, if
+  needed). **No `README.md`** — `AGENTS.md`/`docs/GUIDE.md` is the reference for how a
+  feature is shaped; a feature folder does not additionally document itself.
+- `src/services/<concern>/<name>Service.ts` — one typed async method per endpoint (list/
+  create/update/delete, or whichever the feature needs), each method making the actual
+  `apiClient` call and Zod-`.parse()`-ing the response before returning. Matches
+  `src/services/auth/authService.ts`'s shape (a plain object of async methods).
+  `src/services/common/exampleService.ts` is the reference shape.
+- `use<Name>*.ts` (TanStack Query hook, keyed off a new member on
   `src/constants/queryKeys.ts`'s global `QueryKey` enum — never a per-feature key
   factory) under `src/hooks/<concern>/<hookName>.ts` — company-wide convention, never
-  co-located inside the feature's own component folder. `src/hooks/common/
-useExampleItems.ts` is the reference shape.
+  co-located inside the feature's own component folder. **The hook's `queryFn`/
+  `mutationFn` calls the service file above — it never calls `apiClient` directly and
+  never does its own Zod validation** (that's the service function's job). `src/hooks/
+common/useExampleItems.ts` (calling `exampleService.list`) is the reference shape.
 - `<Name>.workflow.test.tsx`, co-located, **mandatory** for a feature — copy
   `ExampleWidget.workflow.test.tsx`'s shape and adapt it to this feature's real flow (load →
   interact → success/empty/error), through `renderWithProviders` and the real MSW-backed
@@ -129,10 +157,23 @@ route per `AGENTS.md`/`docs/onboarding.md`'s routing walkthrough: role-gated →
 (the `ExamplePage` shape this skill scaffolds from) → its own hardcoded `<Route>` in
 `AppRouters.tsx`'s public shell block, not a registry entry in either file above.
 
+Any new API endpoint is a new member on the relevant **portal/concern's** existing route
+enum in `src/constants/<concern>.ts` (`AuthRoutes` in `auth.ts`, `CommonRoutes` in
+`common.ts`, and one such file per additional role/concern the moment it actually gets a
+real endpoint — see `src/routes/roles.ts` for whatever roles currently exist) — never a
+new enum per feature. The route string itself is an absolute path only, never a hardcoded
+host or version prefix (no `/api/v1/...`) — see `AGENTS.md` § Constant Registries.
+
 ## Never
 
 - Barrel `index.ts` for components. Hardcoded strings. Arbitrary Tailwind values. `props: any`.
 - A component that only works for its first call site — if a second usage would need to
   fork it, its variance belongs in props, not a copy-paste.
+- A hook that calls `apiClient` directly instead of a `src/services/<concern>/` function.
+- A new API-route enum named after a feature instead of a portal/concern, or a route
+  string with a hardcoded host/version prefix.
+- A per-feature `README.md`.
+- A new one-off component for something that's really an existing common component with a
+  different variant/size/shape (see Step 3's worked `FloatingActionButton` example).
 
 Finish by running `pnpm verify`.

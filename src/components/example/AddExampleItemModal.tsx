@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogTrigger } from 'src/components/common/Dialog';
 import { Button } from 'src/components/common/Button';
-import { exampleItemInputSchema, type ExampleItemInput } from 'src/schemas/example.schema';
+import { exampleItemInputSchema, type ExampleItemInput } from 'src/schemas/common/example.schema';
 import { useCreateExampleItem } from 'src/hooks/common/useCreateExampleItem';
 import { ExampleItemFormFields } from 'src/components/example/ExampleItemFormFields';
 

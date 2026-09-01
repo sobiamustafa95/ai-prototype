@@ -8,7 +8,7 @@ export const exampleSearchSchema = z.object({
 
 export type ExampleSearchValues = z.infer<typeof exampleSearchSchema>;
 
-/** API contract for a single example item. Shared with the MSW handler + query. */
+/** API contract for a single example item. Shared with the MSW handler + service. */
 export const exampleItemSchema = z.object({
   id: z.string(),
   title: z.string(),

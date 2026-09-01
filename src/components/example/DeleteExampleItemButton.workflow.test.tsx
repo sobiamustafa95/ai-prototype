@@ -3,7 +3,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from 'src/mocks/server';
 import { resetExampleItems } from 'src/mocks/handlers';
-import { ExampleRoutes } from 'src/constants/api-routes';
+import { CommonRoutes } from 'src/constants/common';
 import { ConfirmDialog } from 'src/components/common/ConfirmDialog';
 import { renderWithProviders } from 'src/test/renderWithProviders';
 import { useExampleWidgetStore } from './exampleWidgetStore';
@@ -59,7 +59,7 @@ describe('DeleteExampleItemButton workflow', () => {
     // one-off server.use() override is the documented escape hatch for exactly
     // this (AGENTS.md § Testing).
     server.use(
-      http.delete(`${ExampleRoutes.LIST}/:id`, () =>
+      http.delete(`${CommonRoutes.EXAMPLE_ITEMS}/:id`, () =>
         HttpResponse.json({ message: 'Internal server error.' }, { status: 500 })
       )
     );
