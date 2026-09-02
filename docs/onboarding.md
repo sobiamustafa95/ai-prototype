@@ -104,8 +104,8 @@ whatever Node 22+ toolchain manager you prefer.
   paginated/searchable list screen. Already wired to a TanStack Query hook
   (`src/hooks/common/useExampleItems.ts` — hooks live under `src/hooks/<concern>/`, not
   the feature folder) keyed off the global `QueryKey` enum
-  (`src/constants/queryKeys.ts`), a feature-scoped Zustand store (`exampleWidgetStore.ts`,
-  which — unlike hooks — does stay in the feature folder), full accessibility, and its
+  (`src/constants/queryKeys.ts`), URL-addressable search/page/modal state
+  (`src/lib/url-state/` — see `docs/adr/url-page-state.md`), full accessibility, and its
   `*.workflow.test.tsx`. Copy this shape for any new **list/browse/search** feature.
 - **`components/auth/` + `pages/auth/`** — a full multi-page form flow (login → OTP → reset,
   etc.). Wired to React Hook Form + Zod (`auth.schema.ts`), mutations with the

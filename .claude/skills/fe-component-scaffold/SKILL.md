@@ -61,9 +61,15 @@ Ask a follow-up: _"Should I design it, or will you provide a screenshot/descript
 Before writing any new component code, actually look for something that already does this —
 don't rely on remembering the repo from earlier in the conversation:
 
-- List `src/components/common/` and, if Step 1 named a concern/portal folder, that folder too
-  (`src/components/<concern>/` or `src/components/<portal>/`). Read the props/purpose of
-  anything that looks related, not just filenames that happen to match.
+- List `src/components/common/`, the concern/portal folder Step 1 named
+  (`src/components/<concern>/` or `src/components/<portal>/`), **and every other
+  `src/components/<role>/` folder that exists** (`ls src/components/` — anything that isn't
+  `common/auth/example/layouts` is a role folder, same list `roleBoundaries/
+no-cross-role-component-import` in `eslint.config.js` derives it from). Read the props/
+  purpose of anything that looks related, not just filenames that happen to match. Checking
+  every role folder, not only the target one, is what catches the cross-role case in the
+  promotion rule below — skipping it is how a second, near-identical component quietly gets
+  built in a different role's folder instead of being found.
 - **Don't just match "same core purpose" — also ask "is this a new variant of an existing
   component?"** A near-duplicate isn't only "another table/list/modal" — it's also a
   different _look_ (shape, size, position) of something that already exists but currently
@@ -97,6 +103,30 @@ don't rely on remembering the repo from earlier in the conversation:
     belongs in props, not a copy-paste; and `AGENTS.md` § Component Conventions' "a new look
     on an existing common component is a new `cva()` variant, never a parallel component"
     rule).
+  - **Near-duplicate found, but it lives in a _different_ role's folder
+    (`src/components/<other-role>/`) than the one this new component belongs to → promote
+    it, don't cross-import and don't duplicate it.** `roleBoundaries/no-cross-role-component-
+import` (`eslint.config.js`) hard-blocks importing it from outside that role as-is, and
+    copy-pasting a second near-identical version into the new role's folder is exactly the
+    duplication Step 3 exists to prevent — neither is the fix once **two** roles genuinely
+    need the same shape. Concretely (worked example: a `Drawer` built for
+    `components/customer/`, then needed — with small adjustments — on an admin page):
+    1. Confirm with the user this is really the same underlying component with new
+       variant/prop needs, not two components that only coincidentally look similar today
+       (same test as the ambiguous case above — ask if it's not obvious).
+    2. Move the file from `src/components/<original-role>/` to `src/components/common/`,
+       generalizing it on the way: strip anything hardcoded to the original role (copy,
+       role-specific data shape, a role-specific default) out into props, the same way any
+       other common component takes its variance through props rather than assuming a
+       single caller.
+    3. Update the original role's existing call site(s) to import from the new
+       `src/components/common/` location — the component's behavior for that role must not
+       change as a side effect of the move.
+    4. Add whatever new variant/size/prop the new role's use case needs (Step 4 below),
+       same as extending any other common component.
+    5. Build the new role's usage against the now-common component.
+       A component already living in `src/components/common/` needs no such move — this
+       sub-step only applies the first time a role-private component gains a second role.
 
 ## Step 4 — Build
 
@@ -175,5 +205,9 @@ host or version prefix (no `/api/v1/...`) — see `AGENTS.md` § Constant Regist
 - A per-feature `README.md`.
 - A new one-off component for something that's really an existing common component with a
   different variant/size/shape (see Step 3's worked `FloatingActionButton` example).
+- A cross-role import to reuse a role-private component from another role's folder
+  (`roleBoundaries/no-cross-role-component-import` blocks it), or a second near-duplicate
+  copy in the new role's own folder — promote it into `src/components/common/` instead
+  (Step 3's promotion sub-step).
 
 Finish by running `pnpm verify`.

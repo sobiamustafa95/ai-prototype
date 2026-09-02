@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
@@ -12,10 +11,13 @@ import {
   type ExampleSearchValues,
 } from 'src/schemas/common/example.schema';
 import { useExampleItems } from 'src/hooks/common/useExampleItems';
-import { EXAMPLE_PAGE_SIZE, useExampleWidgetStore } from './exampleWidgetStore';
+import { useTableUrlState } from 'src/lib/url-state/useTableUrlState';
+import { useModalUrlState } from 'src/lib/url-state/useModalUrlState';
 import { AddExampleItemModal } from './AddExampleItemModal';
 import { EditExampleItemModal } from './EditExampleItemModal';
 import { DeleteExampleItemButton } from './DeleteExampleItemButton';
+
+const DEFAULT_PAGE_SIZE = 10;
 
 interface ExampleWidgetProps {
   /** Section heading. Defaults to a generic label — override per usage. */
@@ -27,19 +29,18 @@ interface ExampleWidgetProps {
 /**
  * Reference feature: a paginated, searchable, full-CRUD list — the reference shape
  * for AGENTS.md § Data & State's mutation-invalidation pattern (see
- * src/hooks/common/useCreateExampleItem.ts/useUpdateExampleItem.ts/useDeleteExampleItem.ts).
- * Demonstrates typed props, RHF+Zod forms, Zustand UI state, TanStack Query data +
- * mutations, full keyboard/screen-reader accessibility, and token-only Tailwind styling.
+ * src/hooks/common/useCreateExampleItem.ts/useUpdateExampleItem.ts/useDeleteExampleItem.ts)
+ * and for docs/adr/url-page-state.md's URL-addressable page state. Demonstrates typed
+ * props, RHF+Zod forms, URL + TanStack Query data + mutations, full keyboard/
+ * screen-reader accessibility, and token-only Tailwind styling. Search text, page
+ * number, and which row's edit modal is open all live in the URL (`?q=...&page=...
+ * &modal=edit&id=...`) instead of `useState`/Zustand — a refresh or a shared link
+ * reproduces the exact same view.
  */
-export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: ExampleWidgetProps) {
+export function ExampleWidget({ heading, pageSize = DEFAULT_PAGE_SIZE }: ExampleWidgetProps) {
   const { t } = useTranslation();
-  const query = useExampleWidgetStore((state) => state.query);
-  const page = useExampleWidgetStore((state) => state.page);
-  const setQuery = useExampleWidgetStore((state) => state.setQuery);
-  const setPage = useExampleWidgetStore((state) => state.setPage);
-  // Which row's edit modal is open — transient, component-local UI state, not
-  // worth promoting into exampleWidgetStore.ts (see AGENTS.md § Data & State).
-  const [editingItem, setEditingItem] = useState<ExampleItem | null>(null);
+  const { query, page, setQuery, setPage } = useTableUrlState();
+  const editModal = useModalUrlState(['edit'] as const);
 
   const { register, handleSubmit } = useForm<ExampleSearchValues>({
     resolver: zodResolver(exampleSearchSchema),
@@ -47,6 +48,16 @@ export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: Example
   });
 
   const { data, isLoading, isError, refetch } = useExampleItems({ query, page, pageSize });
+
+  // The edit modal's `id` param only names a row — the row itself is looked up from
+  // whatever's already loaded, so a stale/bad `id` (e.g. a shared link opened after
+  // the item moved off this page) just fails to find a match and the modal stays
+  // closed instead of crashing (AGENTS.md: "a bad value in the URL must not break
+  // the page").
+  const editingItem: ExampleItem | null =
+    editModal.modal === 'edit'
+      ? (data?.items.find((item) => item.id === editModal.id) ?? null)
+      : null;
 
   const pageCount = data ? getPageCount(data.total, pageSize) : 1;
   const onSubmit = handleSubmit((values) => {
@@ -115,7 +126,7 @@ export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: Example
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    setEditingItem(item);
+                    editModal.open('edit', item.id);
                   }}
                 >
                   {t('BUTTON_EDIT')}
@@ -130,7 +141,7 @@ export function ExampleWidget({ heading, pageSize = EXAMPLE_PAGE_SIZE }: Example
       <EditExampleItemModal
         item={editingItem}
         onOpenChange={(open) => {
-          if (!open) setEditingItem(null);
+          if (!open) editModal.close();
         }}
       />
 

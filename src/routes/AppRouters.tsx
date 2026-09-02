@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { createBrowserRouter, createRoutesFromElements, Route } from 'react-router-dom';
+import { createBrowserRouter, createRoutesFromElements, Outlet, Route } from 'react-router-dom';
+import { NuqsAdapter } from 'nuqs/adapters/react-router/v7';
 import { AppLayout } from 'src/components/layouts/AppLayout';
 import { AuthLayout } from 'src/components/layouts/AuthLayout';
 import { RoleLayout } from 'src/components/layouts/RoleLayout';
@@ -28,7 +29,17 @@ function withSuspense(element: ReactNode) {
 
 export const router = createBrowserRouter(
   createRoutesFromElements(
-    <>
+    // Wraps every route in NuqsAdapter (docs/adr/url-page-state.md) so any page's
+    // useQueryState/useQueryStates calls have router context to read/write search
+    // params through — must sit inside the tree RouterProvider renders, not
+    // outside it, since it reads router hooks (useSearchParams/useNavigate).
+    <Route
+      element={
+        <NuqsAdapter>
+          <Outlet />
+        </NuqsAdapter>
+      }
+    >
       {/* Public shell: 403, and anything reachable whether signed in or not. "/"
           itself is never real content — HomeRedirectRoute always sends a
           visitor on to their role's home route (signed in) or /login (signed
@@ -87,6 +98,6 @@ export const router = createBrowserRouter(
           />
         ))}
       </Route>
-    </>
+    </Route>
   )
 );

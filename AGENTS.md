@@ -35,8 +35,12 @@ Two rules override everything else:
   own `@theme` tokens — never adopt shadcn's default `--primary`/`--secondary` CSS variables.
   `src/lib/utils.ts` exports the `cn()` class-merge helper every common component uses.
 - **Routing:** React Router v7 data router (`createBrowserRouter`)
+- **URL page state:** `nuqs` (`src/lib/url-state/`) — filters, search text, page number, the
+  selected tab, and small-dialog context live in the URL, not `useState`/Zustand. See
+  § Data & State's own bullet and `docs/adr/url-page-state.md` for the full decision.
 - **Styling:** Tailwind CSS v4 (CSS-first `@theme` tokens in `src/index.css`)
-- **Client state:** Zustand (feature-scoped stores) · **Server state:** TanStack Query v5
+- **Client state:** Zustand (feature-scoped stores, for state that genuinely shouldn't be
+  shareable/bookmarkable — see § Data & State) · **Server state:** TanStack Query v5
 - **Forms:** React Hook Form + Zod (`src/schemas/`; shared primitives in `common.schema.ts`)
 - **HTTP:** Axios typed client with interceptors (`src/services/api-client.ts`)
 - **Env validation:** Zod-validated `import.meta.env` (`src/constants/env.ts`) — fails loudly
@@ -94,7 +98,14 @@ src/
                           to list there when a role is added, it derives "which folders
                           are roles" from AGENTS.md rule #1's own concern-folder
                           exception list (common/auth/example/layouts), not a hardcoded
-                          role name.
+                          role name. A component that started role-private and is now
+                          needed by a second role never gets a cross-role import (the
+                          lint rule blocks it) or a duplicate copy in the new role's
+                          folder — it gets **promoted**: moved into
+                          `components/common/`, generalized (role-specific naming/copy
+                          pushed into props), both roles' call sites repointed at the
+                          common location. See `fe-component-scaffold`'s Step 3 for the
+                          full promotion workflow.
   components/layouts/    AppLayout, AuthLayout, ErrorLayout, RoleLayout (renders the right
                           shell for whichever role is signed in — driven by
                           routes/ProtectedRoutes.tsx, not a separate layout per role)
@@ -123,7 +134,11 @@ src/
                           role-specific today) — expected, not a gap, same as
                           components/admin/ and components/member/ themselves; see
                           hooks/README.md.
-  lib/                   utils.ts (cn() class-merge helper for CVA/Radix components)
+  lib/                   utils.ts (cn() class-merge helper for CVA/Radix components);
+                          url-state/ (keys.ts's UrlStateKey registry + useTableUrlState.ts/
+                          useModalUrlState.ts, the nuqs-backed hooks every URL-addressable
+                          list/dialog page copies — see § Data & State and
+                          docs/adr/url-page-state.md)
   services/<concern>/    api-client.ts and queryClient.ts stay at services/ root —
                           cross-cutting infrastructure every concern's service depends
                           on, not a "concern" of their own (same reasoning that keeps
@@ -429,9 +444,26 @@ export enum Role {
   a try/catch. Put success toast + cache/store updates in the hook's `onSuccess`; put call-site
   UI effects (`navigate`, `form.reset()`) in the `mutate()` call's own `onSuccess` callback —
   never after an `await mutateAsync(...)`, which runs even mid-navigation/unmount.
-- **Client/UI state:** Zustand, one slice per domain; feature UI state lives in the feature
-  folder. Auth state (`authStore.ts`) is `persist`-backed — it is the single source of truth
-  for the access/refresh token pair; nothing else touches `localStorage` for it directly.
+- **URL-addressable page state:** filters, sort, search text, page number, the selected tab,
+  and a dialog's open/context state are URL query params via `nuqs` (`src/lib/url-state/`),
+  not `useState`/Zustand — a refresh or a link a colleague opens must reproduce the exact
+  same view (docs/adr/url-page-state.md, issue #32). `useTableUrlState()`
+  (`src/lib/url-state/useTableUrlState.ts`) is the reference hook for a paginated/searchable
+  list — copy it the same way a new feature copies `ExampleWidget` itself. A small dialog's
+  context goes in a query param too (D1 — `useModalUrlState.ts`, `?modal=edit&id=42`); a
+  dialog large/complex enough to deserve its own URL segment is a child route instead (D2) —
+  no example ships yet, but nothing about `useModalUrlState`'s shape blocks adding one. Every
+  URL param uses a `nuqs` parser with `.withDefault(...)` so a malformed value (`?page=abc`)
+  falls back to the default instead of crashing the page — never hand-parse
+  `useSearchParams()` output directly. A page's own new key (a status filter, e.g.) is a
+  plain string key alongside `UrlStateKey`'s registry, not forced into it — that registry
+  only owns the six keys (`page`, `limit`, `q`, `sort`, `tab`, `modal`) that repeat across
+  pages. Never put a token, session id, or other personal data in a URL param.
+- **Client/UI state:** Zustand, one slice per domain; feature UI state that is genuinely
+  transient (hover, focus, unsaved form input — never worth a shareable link) lives in the
+  feature folder, as `useState` or a Zustand slice. Auth state (`authStore.ts`) is
+  `persist`-backed — it is the single source of truth for the access/refresh token pair;
+  nothing else touches `localStorage` for it directly.
 - **Forms:** React Hook Form + `zodResolver`; share Zod types between form + API. Reuse a
   primitive from `src/schemas/common/common.schema.ts` (email/password/phone/url) instead
   of redefining validation inline when one already covers the field.

@@ -2,7 +2,6 @@ import { cleanup, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { resetExampleItems } from 'src/mocks/handlers';
 import { renderWithProviders } from 'src/test/renderWithProviders';
-import { useExampleWidgetStore } from './exampleWidgetStore';
 import { ExampleWidget } from './ExampleWidget';
 
 function getRow(itemText: string): HTMLElement {
@@ -19,7 +18,6 @@ function getRow(itemText: string): HTMLElement {
 describe('EditExampleItemModal workflow', () => {
   afterEach(() => {
     cleanup();
-    useExampleWidgetStore.setState({ query: '', page: 1 });
     resetExampleItems();
   });
 

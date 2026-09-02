@@ -52,9 +52,10 @@ queryClient.invalidateQueries({ queryKey: [QueryKey.EXAMPLE_LIST] })` so the
   correctly even in uncontrolled mode (neither `open`/`onOpenChange` passed); this
   component passes both anyway, since it needs to close the dialog itself from the
   outside once its async `onConfirm` (the delete mutation) succeeds.
-- `exampleWidgetStore.ts` — feature-scoped Zustand store for `query` / `page` UI
-  state. Which modal is open is deliberately _not_ here — that's transient,
-  component-local state, not worth promoting into the store.
+- `query`/`page`, and which row's edit modal is open, live in the URL — see
+  `src/lib/url-state/useTableUrlState.ts`/`useModalUrlState.ts` and
+  `docs/adr/url-page-state.md` — not a feature-scoped Zustand store or `useState`.
+  A refresh or a shared link reproduces the exact same view.
 
 ## Testing
 

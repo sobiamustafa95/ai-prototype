@@ -1,7 +1,6 @@
 import { cleanup, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from 'src/test/renderWithProviders';
-import { useExampleWidgetStore } from './exampleWidgetStore';
 import { ExampleWidget } from './ExampleWidget';
 
 /**
@@ -12,18 +11,10 @@ import { ExampleWidget } from './ExampleWidget';
  */
 describe('ExampleWidget workflow', () => {
   afterEach(() => {
-    // Unmount *before* resetting the store — src/test/setup.ts's own afterEach
-    // also calls cleanup(), but that's a root-level hook and runs after this
-    // describe-scoped one; resetting query/page first, while the just-finished
-    // test's <ExampleWidget> is still mounted and subscribed to
-    // useExampleWidgetStore, re-renders it (and re-keys its TanStack Query,
-    // triggering another background fetch) outside any act() scope (React's
-    // "not wrapped in act(...)" warning). Unmounting first removes the (only)
-    // subscriber, so the reset below has nothing live left to notify.
+    // Search text/page now live in the URL (a MemoryRouter's own search params),
+    // not a module-singleton store, so `renderWithProviders`' fresh MemoryRouter
+    // per test already starts clean — nothing left over to reset here.
     cleanup();
-    // Feature-scoped Zustand store is a module singleton — reset so a later
-    // test never inherits a search/page left over from here.
-    useExampleWidgetStore.setState({ query: '', page: 1 });
   });
 
   it('loads the initial list from the server', async () => {

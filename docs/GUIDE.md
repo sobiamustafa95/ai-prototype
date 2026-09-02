@@ -164,16 +164,17 @@ docs/                          This guide, onboarding, deep-dive docs
 
 **Quick answers to "where does X go?"**
 
-| I want to add…          | Put it in…                                                                                                                 |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| A reusable button/input | `src/components/common/`                                                                                                   |
-| A whole screen/feature  | Copy `src/components/example/` + `pages/common/ExamplePage.tsx`, rename, gut it                                            |
-| Data fetching           | A TanStack Query hook under `src/hooks/<concern>/` (never a raw `useEffect` fetch, never co-located in the feature folder) |
-| UI-only state           | A Zustand store                                                                                                            |
-| A form                  | React Hook Form + a Zod schema in `src/schemas/<concern>/`                                                                 |
-| User-facing text        | A key in `src/i18n/locales/<lng>/common.json`, via `t()` — one file per language only                                      |
-| An API path             | A member on that portal's route enum in `src/constants/<concern>.ts` (no version/host prefix)                              |
-| A pure helper           | `src/utils/`                                                                                                               |
+| I want to add…                                                                 | Put it in…                                                                                                                                 |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| A reusable button/input                                                        | `src/components/common/`                                                                                                                   |
+| A whole screen/feature                                                         | Copy `src/components/example/` + `pages/common/ExamplePage.tsx`, rename, gut it                                                            |
+| Data fetching                                                                  | A TanStack Query hook under `src/hooks/<concern>/` (never a raw `useEffect` fetch, never co-located in the feature folder)                 |
+| Filters, page, tab, search text, a small dialog's open state                   | A URL query param via `nuqs` (`src/lib/url-state/`) — see AGENTS.md's "URL-addressable page state" bullet and `docs/adr/url-page-state.md` |
+| UI-only state that shouldn't be a shareable link (hover, focus, unsaved input) | A Zustand store or `useState`                                                                                                              |
+| A form                                                                         | React Hook Form + a Zod schema in `src/schemas/<concern>/`                                                                                 |
+| User-facing text                                                               | A key in `src/i18n/locales/<lng>/common.json`, via `t()` — one file per language only                                                      |
+| An API path                                                                    | A member on that portal's route enum in `src/constants/<concern>.ts` (no version/host prefix)                                              |
+| A pure helper                                                                  | `src/utils/`                                                                                                                               |
 
 ---
 

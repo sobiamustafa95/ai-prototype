@@ -6,7 +6,6 @@ import { resetExampleItems } from 'src/mocks/handlers';
 import { CommonRoutes } from 'src/constants/common';
 import { ConfirmDialog } from 'src/components/common/ConfirmDialog';
 import { renderWithProviders } from 'src/test/renderWithProviders';
-import { useExampleWidgetStore } from './exampleWidgetStore';
 import { ExampleWidget } from './ExampleWidget';
 
 function getRow(itemText: string): HTMLElement {
@@ -25,7 +24,6 @@ function getRow(itemText: string): HTMLElement {
 describe('DeleteExampleItemButton workflow', () => {
   afterEach(() => {
     cleanup();
-    useExampleWidgetStore.setState({ query: '', page: 1 });
     resetExampleItems();
   });
 
