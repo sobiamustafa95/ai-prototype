@@ -60,9 +60,20 @@ export function ExampleWidget({ heading, pageSize = DEFAULT_PAGE_SIZE }: Example
       : null;
 
   const pageCount = data ? getPageCount(data.total, pageSize) : 1;
-  const onSubmit = handleSubmit((values) => {
+
+  function handleSearch(values: ExampleSearchValues) {
     setQuery(values.query);
-  });
+  }
+
+  // Trigger-handler: opens the edit modal only — no mutation. The
+  // action-handler that runs the update mutation (`handleUpdate`) lives in
+  // `EditExampleItemModal.tsx`, since that's the component whose own
+  // `useUpdateExampleItem()` mutation the submit actually calls.
+  function handleEditClick(id: string) {
+    editModal.open('edit', id);
+  }
+
+  const onSubmit = handleSubmit(handleSearch);
 
   return (
     <section aria-labelledby="example-widget-heading" className="flex flex-col gap-6">
@@ -126,7 +137,7 @@ export function ExampleWidget({ heading, pageSize = DEFAULT_PAGE_SIZE }: Example
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    editModal.open('edit', item.id);
+                    handleEditClick(item.id);
                   }}
                 >
                   {t('BUTTON_EDIT')}

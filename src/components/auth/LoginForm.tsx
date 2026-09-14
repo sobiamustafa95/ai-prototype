@@ -25,18 +25,25 @@ export function LoginForm() {
     formState: { errors },
   } = useForm<LoginValues>({ resolver: zodResolver(loginSchema) });
 
+  // Action-handler: runs the mutation. No trigger-handler needed here — the
+  // form's own `onSubmit` is the only entry point, there's no separate "open"
+  // step the way a modal has (AGENTS.md § Component Conventions).
+  function handleLogin(values: LoginValues) {
+    login.mutate(values, {
+      onSuccess: ({ user }) => {
+        const from = (location.state as LocationState | null)?.from?.pathname;
+        void navigate(from ?? getHomeRouteForRole(user.role), { replace: true });
+      },
+    });
+  }
+
+  const onSubmit = handleSubmit(handleLogin);
+
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        void handleSubmit((values) => {
-          login.mutate(values, {
-            onSuccess: ({ user }) => {
-              const from = (location.state as LocationState | null)?.from?.pathname;
-              void navigate(from ?? getHomeRouteForRole(user.role), { replace: true });
-            },
-          });
-        })(event);
+        void onSubmit(event);
       }}
       noValidate
     >

@@ -394,6 +394,50 @@ export enum Role {
   component's actual visual identity out into a one-off duplicate. This is the same
   reasoning `fe-component-scaffold`'s duplicate-check step applies before scaffolding
   anything new (`.claude/skills/fe-component-scaffold/SKILL.md`).
+- **Named event handlers, not inline logic.** An event-handler prop (`onClick`, `onSubmit`,
+  `onConfirm`, and the like) is a `handle<Action>` function — camelCase, verb-first, the
+  action named plainly — defined in the component body and passed by reference, whenever its
+  body does more than one trivial step or touches a mutation/state-with-a-side-effect. The
+  **only** exception is a callback that is a single, self-explanatory statement with no
+  mutation call (`onClick={() => setOpen(false)}`) — that may stay inline; the moment a second
+  step or a `.mutate(...)` call joins it, extract a named handler.
+- **A CRUD action's handler always splits into two, never one.** A create/update/delete
+  action is never one handler doing both "open the modal" and "run the mutation" — it's always
+  a **trigger-handler** (opens the modal/dialog, sets state, nothing else — never a mutation)
+  and a separate **action-handler** (runs the `.mutate()` call, wired to the modal's own
+  `onConfirm`/`onSubmit`), even when the trigger step looks trivial enough to inline. Naming:
+  the trigger-handler is `handle<Action>Click` (`handleDeleteClick`, `handleEditClick`,
+  `handleAddClick`); the action-handler is `handle<Action>` or `handleConfirm<Action>`
+  (`handleCreate`, `handleUpdate`, `handleConfirmDelete`). This holds even when a Radix
+  `DialogTrigger asChild` already opens the dialog on click on its own — the trigger-handler
+  still gets written explicitly (Radix's Slot composes it with the Trigger's own internal
+  toggle without conflict) so every CRUD piece reads with the identical two-step shape,
+  instead of some pieces relying on a reader knowing Radix's internal behavior and others not.
+  ```tsx
+  // Before — one handler doing both jobs
+  <ConfirmDialog
+    onConfirm={() => {
+      deleteItem.mutate(item.id, { onSuccess: () => setOpen(false) });
+    }}
+  />
+
+  // After — trigger-handler (open) and action-handler (mutate), kept separate
+  function handleDeleteClick() {
+    setOpen(true);
+  }
+  function handleConfirmDelete() {
+    deleteItem.mutate(item.id, { onSuccess: () => setOpen(false) });
+  }
+  // ...
+  <Button onClick={handleDeleteClick}>{t('BUTTON_DELETE')}</Button>
+  <ConfirmDialog onConfirm={handleConfirmDelete} />
+  ```
+  `src/components/example/DeleteExampleItemButton.tsx` (`handleDeleteClick` /
+  `handleConfirmDelete`), `AddExampleItemModal.tsx` (`handleAddClick` / `handleCreate`), and
+  `ExampleWidget.tsx` + `EditExampleItemModal.tsx` (`handleEditClick` / `handleUpdate` — split
+  across two files because the edit modal's own `open` state is driven by a prop, not a
+  trigger it renders itself) are the reference shapes — copy this two-handler shape for any
+  new create/update/delete action.
 
 ---
 

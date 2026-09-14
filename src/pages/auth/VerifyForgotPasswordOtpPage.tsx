@@ -22,6 +22,20 @@ export function VerifyForgotPasswordOtpPage() {
   // — send the user back to start the flow properly instead of a broken form.
   if (!email) return <Navigate to="/forgot-password" replace />;
 
+  // Action-handler: runs the verify mutation. No trigger-handler needed here
+  // — `OtpForm`'s own submit is the only entry point (AGENTS.md § Component
+  // Conventions). A `const` arrow function, not a hoisted `function`
+  // declaration, so `email`'s narrowing from the guard above (string |
+  // undefined → string) actually applies inside its body.
+  const handleVerify = async (otp: string) => {
+    const { resetToken } = await verifyOtp.mutateAsync({ email, otp });
+    void navigate('/reset-password', { state: { resetToken } });
+  };
+
+  // Action-handler: runs the resend mutation, wired to `OtpForm`'s own resend
+  // button. Same `const` arrow reasoning as `handleVerify` above.
+  const handleResend = () => resend.mutateAsync({ email });
+
   return (
     <>
       <Seo title={t('AUTH_OTP_TITLE')} />
@@ -29,14 +43,7 @@ export function VerifyForgotPasswordOtpPage() {
         {t('AUTH_OTP_TITLE')}
       </h2>
       <p className="text-foreground-muted mb-4 text-center text-sm">{t('AUTH_OTP_BODY')}</p>
-      <OtpForm
-        email={email}
-        onVerify={async (otp) => {
-          const { resetToken } = await verifyOtp.mutateAsync({ email, otp });
-          void navigate('/reset-password', { state: { resetToken } });
-        }}
-        onResend={() => resend.mutateAsync({ email })}
-      />
+      <OtpForm email={email} onVerify={handleVerify} onResend={handleResend} />
     </>
   );
 }

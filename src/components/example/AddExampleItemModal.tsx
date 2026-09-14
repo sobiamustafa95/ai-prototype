@@ -25,19 +25,35 @@ export function AddExampleItemModal() {
   } = useForm<ExampleItemInput>({ resolver: zodResolver(exampleItemInputSchema) });
   const createItem = useCreateExampleItem();
 
-  const onSubmit = handleSubmit((values) => {
+  // Trigger-handler: opens the dialog only — no mutation. `DialogTrigger
+  // asChild` already wires its own click-to-open behavior onto this Button;
+  // this handler runs alongside it (Radix's Slot composes both), kept
+  // explicit so this piece's open-step reads identically to Delete/Edit's own
+  // trigger-handler rather than relying on a reader knowing Radix's internal
+  // toggle exists.
+  function handleAddClick() {
+    setOpen(true);
+  }
+
+  // Action-handler: runs the mutation. Called from the form's `onSubmit`,
+  // never from the trigger above.
+  function handleCreate(values: ExampleItemInput) {
     createItem.mutate(values, {
       onSuccess: () => {
         reset();
         setOpen(false);
       },
     });
-  });
+  }
+
+  const onSubmit = handleSubmit(handleCreate);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button">{t('BUTTON_ADD')}</Button>
+        <Button type="button" onClick={handleAddClick}>
+          {t('BUTTON_ADD')}
+        </Button>
       </DialogTrigger>
       <DialogContent dialogTitle={t('EXAMPLE_ADD_TITLE')}>
         <form

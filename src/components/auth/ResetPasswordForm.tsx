@@ -24,21 +24,28 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
 
   const resetPassword = useResetPassword();
 
+  // Action-handler: runs the mutation. No trigger-handler needed here — the
+  // form's own `onSubmit` is the only entry point (AGENTS.md § Component
+  // Conventions).
+  function handleResetPassword(values: ResetPasswordValues) {
+    resetPassword.mutate(
+      { token, password: values.password },
+      {
+        onSuccess: () => {
+          toast.success(t('SUCCESS'));
+          void navigate('/login', { replace: true });
+        },
+      }
+    );
+  }
+
+  const onSubmit = handleSubmit(handleResetPassword);
+
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        void handleSubmit((values) => {
-          resetPassword.mutate(
-            { token, password: values.password },
-            {
-              onSuccess: () => {
-                toast.success(t('SUCCESS'));
-                void navigate('/login', { replace: true });
-              },
-            }
-          );
-        })(event);
+        void onSubmit(event);
       }}
       noValidate
     >

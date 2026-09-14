@@ -34,7 +34,11 @@ export function EditExampleItemModal({ item, onOpenChange }: EditExampleItemModa
     if (item) reset({ title: item.title, description: item.description });
   }, [item, reset]);
 
-  const onSubmit = handleSubmit((values) => {
+  // Action-handler: runs the mutation. The trigger-handler that opens this
+  // modal (`handleEditClick`) lives in `ExampleWidget.tsx`, since this
+  // component's own `open` state is driven entirely by the `item` prop it's
+  // given, not by a trigger it renders itself.
+  function handleUpdate(values: ExampleItemInput) {
     if (!item) return;
     updateItem.mutate(
       { id: item.id, ...values },
@@ -44,7 +48,9 @@ export function EditExampleItemModal({ item, onOpenChange }: EditExampleItemModa
         },
       }
     );
-  });
+  }
+
+  const onSubmit = handleSubmit(handleUpdate);
 
   return (
     <Dialog open={item !== null} onOpenChange={onOpenChange}>

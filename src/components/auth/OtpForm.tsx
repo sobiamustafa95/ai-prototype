@@ -42,14 +42,27 @@ export function OtpForm({ email, onVerify, onResend }: OtpFormProps) {
     },
   });
 
+  // Action-handler: runs the verify mutation. No trigger-handler needed here
+  // — the form's own `onSubmit` is the only entry point (AGENTS.md §
+  // Component Conventions). `.catch(() => {})` — the global onError already
+  // handles the error; without it a rejected mutateAsync is an unhandled
+  // promise rejection (AGENTS.md § Data & State).
+  function handleVerify(values: OtpValues) {
+    return verify.mutateAsync(values).catch(() => {});
+  }
+
+  // Action-handler: runs the resend mutation, wired to its own Button below.
+  function handleResend() {
+    resend.mutate();
+  }
+
+  const onSubmit = handleSubmit(handleVerify);
+
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        // .catch(() => {}) — the global onError already handles the error;
-        // without it a rejected mutateAsync is an unhandled promise rejection
-        // (AGENTS.md § Data & State).
-        void handleSubmit((values) => verify.mutateAsync(values).catch(() => {}))(event);
+        void onSubmit(event);
       }}
       noValidate
     >
@@ -75,9 +88,7 @@ export function OtpForm({ email, onVerify, onResend }: OtpFormProps) {
         variant="ghost"
         size="sm"
         disabled={resend.isPending}
-        onClick={() => {
-          resend.mutate();
-        }}
+        onClick={handleResend}
       >
         {t('BUTTON_RESEND_CODE')}
       </Button>

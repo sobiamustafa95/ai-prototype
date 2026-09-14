@@ -25,6 +25,17 @@ function SidebarShell({ titleKey, navItems }: SidebarShellProps) {
   const logout = useLogout();
   const { t } = useTranslation();
 
+  // Action-handler: runs the mutation. No trigger-handler needed here — this
+  // Button is the only entry point, there's no separate "open" step (AGENTS.md
+  // § Component Conventions).
+  function handleLogout() {
+    logout.mutate(undefined, {
+      onSuccess: () => {
+        void navigate('/login', { replace: true });
+      },
+    });
+  }
+
   return (
     <div className="bg-surface text-foreground flex min-h-screen">
       <aside className="border-border bg-surface-muted w-56 shrink-0 border-r">
@@ -59,18 +70,7 @@ function SidebarShell({ titleKey, navItems }: SidebarShellProps) {
         <header className="border-border flex items-center justify-end gap-4 border-b px-6 py-3">
           {user ? <span className="text-foreground-muted text-sm">{user.email}</span> : null}
           <ThemeToggle />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              logout.mutate(undefined, {
-                onSuccess: () => {
-                  void navigate('/login', { replace: true });
-                },
-              });
-            }}
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={handleLogout}>
             {t('NAV_SIGN_OUT')}
           </Button>
         </header>

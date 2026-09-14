@@ -19,17 +19,24 @@ export function SignupForm() {
 
   const signup = useSignup();
 
+  // Action-handler: runs the mutation. No trigger-handler needed here — the
+  // form's own `onSubmit` is the only entry point (AGENTS.md § Component
+  // Conventions).
+  function handleSignup(values: SignupValues) {
+    signup.mutate(values, {
+      onSuccess: (_data, variables) => {
+        void navigate('/verify-signup-otp', { state: { email: variables.email } });
+      },
+    });
+  }
+
+  const onSubmit = handleSubmit(handleSignup);
+
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        void handleSubmit((values) => {
-          signup.mutate(values, {
-            onSuccess: (_data, variables) => {
-              void navigate('/verify-signup-otp', { state: { email: variables.email } });
-            },
-          });
-        })(event);
+        void onSubmit(event);
       }}
       noValidate
     >

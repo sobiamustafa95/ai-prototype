@@ -18,17 +18,24 @@ export function ForgotPasswordForm() {
 
   const forgotPassword = useForgotPassword();
 
+  // Action-handler: runs the mutation. No trigger-handler needed here — the
+  // form's own `onSubmit` is the only entry point (AGENTS.md § Component
+  // Conventions).
+  function handleForgotPassword(values: ForgotPasswordValues) {
+    forgotPassword.mutate(values, {
+      onSuccess: (_data, variables) => {
+        void navigate('/verify-forgot-password-otp', { state: { email: variables.email } });
+      },
+    });
+  }
+
+  const onSubmit = handleSubmit(handleForgotPassword);
+
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
-        void handleSubmit((values) => {
-          forgotPassword.mutate(values, {
-            onSuccess: (_data, variables) => {
-              void navigate('/verify-forgot-password-otp', { state: { email: variables.email } });
-            },
-          });
-        })(event);
+        void onSubmit(event);
       }}
       noValidate
     >
