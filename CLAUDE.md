@@ -17,3 +17,17 @@
 - Git/commit/execution boundaries: see `AGENTS.md` § Agent Execution Safety and § Never Do.
 - After changing any `.claude/commands/*.md`, run `pnpm ai:sync` so Cursor's mirror stays current
   (`pnpm ai:check` — part of `pnpm verify` — fails CI if you forget).
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues (`gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Defaults: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
