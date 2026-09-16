@@ -1,1 +1,4 @@
+# Ensure pnpm is findable when Cursor runs git hooks with a minimal PATH.
+export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
+
 node scripts/hooks/pre-commit.mjs
