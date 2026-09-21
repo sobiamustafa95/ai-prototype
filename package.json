@@ -1,9 +1,9 @@
 {
-  "name": "geeks-fe-boilerplate",
+  "name": "snap-dismiss",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Company-wide, domain-agnostic, production-grade React + Vite boilerplate for Geeks.",
+  "description": "California drivers prepare a Trial by Written Declaration (TR-205) defense packet without appearing in court.",
   "engines": {
     "node": ">=22.0.0"
   },
